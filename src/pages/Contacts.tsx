@@ -31,6 +31,8 @@ import {
   Settings,
   MessageSquare,
   ChevronDown,
+  Play,
+  Pause,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -112,6 +114,10 @@ const Contacts = () => {
 
   // IVR configuration for calls
   const [ivrMenuStructure, setIvrMenuStructure] = useState<Array<{ key: string; label: string; submenus?: Array<{ key: string; label: string }> }>>([]);
+
+  // Audio preview playback
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   // WhatsApp template selection
   interface WhatsAppTemplate {
@@ -385,10 +391,68 @@ const Contacts = () => {
   };
 
   const removeAudio = () => {
+    // Stop playback if playing
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+    setIsPlayingAudio(false);
     setAudioFile(null);
     setAudioFileName(null);
     setAudioError(null);
     setUploadedAudioPath(null);
+  };
+
+  // Toggle audio preview playback
+  const toggleAudioPreview = async () => {
+    if (!uploadedAudioPath) return;
+
+    if (isPlayingAudio && audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    try {
+      // Get signed URL for playback
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('call-audios')
+        .createSignedUrl(uploadedAudioPath, 300); // 5 minutes
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        toast({
+          title: "Erro ao reproduzir áudio",
+          description: "Não foi possível carregar o áudio.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create audio element and play
+      const audio = new Audio(signedUrlData.signedUrl);
+      audioPlayerRef.current = audio;
+
+      audio.onended = () => {
+        setIsPlayingAudio(false);
+        audioPlayerRef.current = null;
+      };
+
+      audio.onerror = () => {
+        setIsPlayingAudio(false);
+        audioPlayerRef.current = null;
+        toast({
+          title: "Erro ao reproduzir",
+          description: "Formato de áudio não suportado.",
+          variant: "destructive"
+        });
+      };
+
+      await audio.play();
+      setIsPlayingAudio(true);
+    } catch (error) {
+      console.error('Erro ao reproduzir áudio:', error);
+      setIsPlayingAudio(false);
+    }
   };
 
   // Open campaign modal instead of executing directly
@@ -992,6 +1056,26 @@ const Contacts = () => {
                                 <CheckCircle2 className="w-4 h-4 text-green-400" />
                               ) : null}
                             </div>
+                            
+                            {/* Play/Pause Button */}
+                            {uploadedAudioPath && !isUploadingAudio && (
+                              <button
+                                onClick={toggleAudioPreview}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  isPlayingAudio 
+                                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                                    : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300'
+                                }`}
+                                title={isPlayingAudio ? 'Pausar áudio' : 'Ouvir áudio'}
+                              >
+                                {isPlayingAudio ? (
+                                  <Pause className="w-4 h-4" />
+                                ) : (
+                                  <Play className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+
                             <button
                               onClick={removeAudio}
                               className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
