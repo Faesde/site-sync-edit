@@ -25,7 +25,10 @@ import {
   ExternalLink,
   Tag,
   Users,
-  Send
+  Send,
+  Mail,
+  MessageCircle,
+  Hash
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -55,6 +58,22 @@ interface Campaign {
   created_at: string;
 }
 
+interface CampaignResult {
+  id: string;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  channel_type: 'whatsapp' | 'call' | 'sms' | 'email';
+  contact_phone: string;
+  contact_name: string | null;
+  message_content: string | null;
+  dtmf_response: string | null;
+  dtmf_path: Array<{ key: string; label: string }> | null;
+  call_duration: number | null;
+  call_status: string | null;
+  status: string;
+  created_at: string;
+}
+
 interface ConversationGroup {
   contact_phone: string;
   contact_name: string | null;
@@ -72,12 +91,23 @@ interface MessageQueueItem {
   template_body: string | null;
 }
 
+type ChannelFilter = 'all' | 'whatsapp' | 'call' | 'sms' | 'email';
+
+const channelConfig = {
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: 'text-green-500 bg-green-500/10' },
+  call: { label: 'Ligação', icon: Phone, color: 'text-purple-500 bg-purple-500/10' },
+  sms: { label: 'SMS', icon: MessageSquare, color: 'text-orange-500 bg-orange-500/10' },
+  email: { label: 'E-mail', icon: Mail, color: 'text-blue-500 bg-blue-500/10' },
+};
+
 const Results = () => {
   const { user, loading: authLoading } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignResults, setCampaignResults] = useState<CampaignResult[]>([]);
   const [messageQueue, setMessageQueue] = useState<MessageQueueItem[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedChannel, setSelectedChannel] = useState<ChannelFilter>("all");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContact, setSelectedContact] = useState<string | null>(null);
@@ -110,7 +140,7 @@ const Results = () => {
       if (campaignsError) throw campaignsError;
       setCampaigns(campaignsData || []);
       
-      // Fetch conversations
+      // Fetch conversations (WhatsApp)
       const { data, error } = await supabaseWiki
         .from('whatsapp_conversations')
         .select('*')
@@ -119,6 +149,19 @@ const Results = () => {
 
       if (error) throw error;
       setConversations(data || []);
+
+      // Fetch campaign results (all channels)
+      const { data: resultsData, error: resultsError } = await supabaseWiki
+        .from('campaign_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (resultsError) {
+        console.error('Error fetching campaign results:', resultsError);
+      } else {
+        setCampaignResults(resultsData || []);
+      }
 
       // Fetch message queue for template info
       const { data: queueData, error: queueError } = await supabaseWiki
@@ -172,6 +215,25 @@ const Results = () => {
           setCampaigns(prev => [payload.new as Campaign, ...prev]);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'wiki',
+          table: 'campaign_results',
+          filter: `user_id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('New campaign result:', payload);
+          setCampaignResults(prev => [payload.new as CampaignResult, ...prev]);
+          const result = payload.new as CampaignResult;
+          const channelLabel = channelConfig[result.channel_type]?.label || result.channel_type;
+          toast({
+            title: `Nova resposta via ${channelLabel}!`,
+            description: `De: ${result.contact_name || result.contact_phone}`,
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -184,13 +246,19 @@ const Results = () => {
     ? conversations 
     : conversations.filter(c => c.campaign_id === selectedCampaign);
 
-  // Helper to normalize phone for matching - extract the core number (last 8 digits)
-  // This handles format variations like 83991151056 vs 558391151056
+  // Filter campaign results by channel and campaign
+  const filteredResults = campaignResults.filter(r => {
+    const channelMatch = selectedChannel === 'all' || r.channel_type === selectedChannel;
+    const campaignMatch = selectedCampaign === 'all' || r.campaign_id === selectedCampaign;
+    const searchMatch = !searchTerm || 
+      r.contact_phone.includes(searchTerm) ||
+      r.contact_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    return channelMatch && campaignMatch && searchMatch;
+  });
+
+  // Helper to normalize phone for matching
   const normalizePhone = (phone: string) => {
-    // Remove all non-digits
     const digits = phone.replace(/\D/g, '');
-    // Get the last 8 digits (core number without DDD/country code variations)
-    // This is the most reliable way to match phones with inconsistent formatting
     if (digits.length >= 8) {
       return digits.slice(-8);
     }
@@ -201,11 +269,9 @@ const Results = () => {
   const groupedConversations = filteredConversations.reduce((acc, conv) => {
     const phone = conv.contact_phone;
     if (!acc[phone]) {
-      // Find template info from message queue
       const normalizedConvPhone = normalizePhone(phone);
       const queueItem = messageQueue.find(q => {
         const normalizedQueuePhone = normalizePhone(q.contact_phone);
-        // Match by phone AND campaign if filtering, otherwise just phone
         const phoneMatch = normalizedConvPhone === normalizedQueuePhone;
         if (selectedCampaign !== "all") {
           return phoneMatch && q.campaign_id === selectedCampaign;
@@ -227,7 +293,6 @@ const Results = () => {
     if (!conv.read_at && conv.direction === 'inbound') {
       acc[phone].unreadCount++;
     }
-    // Update contact name if we have a newer one
     if (conv.contact_name) {
       acc[phone].contact_name = conv.contact_name;
     }
@@ -268,9 +333,13 @@ const Results = () => {
     });
   };
 
-  // Stats based on filtered conversations
-  const totalResponses = filteredConversations.filter(c => c.direction === 'inbound').length;
-  const uniqueContacts = new Set(filteredConversations.map(c => c.contact_phone)).size;
+  // Stats based on filtered data
+  const totalWhatsAppResponses = filteredConversations.filter(c => c.direction === 'inbound').length;
+  const totalCallResponses = filteredResults.filter(r => r.channel_type === 'call').length;
+  const uniqueContacts = new Set([
+    ...filteredConversations.map(c => c.contact_phone),
+    ...filteredResults.map(r => r.contact_phone)
+  ]).size;
   const unreadCount = filteredConversations.filter(c => c.direction === 'inbound' && !c.read_at).length;
 
   // Get current campaign name
@@ -317,11 +386,11 @@ const Results = () => {
           <div>
             <h1 className="text-3xl font-bold mb-2">Resultados das Campanhas</h1>
             <p className="text-muted-foreground">
-              Visualize as respostas recebidas via WhatsApp
+              Visualize as respostas recebidas de todos os canais
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Refresh Button */}
             <Button 
               variant="outline" 
@@ -332,6 +401,40 @@ const Results = () => {
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
+
+            {/* Channel Filter */}
+            <Select value={selectedChannel} onValueChange={(v) => setSelectedChannel(v as ChannelFilter)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Canal" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="all">Todos os canais</SelectItem>
+                <SelectItem value="whatsapp">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-green-500" />
+                    WhatsApp
+                  </div>
+                </SelectItem>
+                <SelectItem value="call">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-purple-500" />
+                    Ligação
+                  </div>
+                </SelectItem>
+                <SelectItem value="sms">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-orange-500" />
+                    SMS
+                  </div>
+                </SelectItem>
+                <SelectItem value="email">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-blue-500" />
+                    E-mail
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             
             {/* Campaign Filter */}
             <div className="flex items-center gap-2">
@@ -394,22 +497,33 @@ const Results = () => {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <MessageSquare className="h-6 w-6 text-primary" />
+              <div className="p-3 bg-green-500/10 rounded-lg">
+                <MessageCircle className="h-6 w-6 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{totalResponses}</p>
-                <p className="text-sm text-muted-foreground">Respostas recebidas</p>
+                <p className="text-2xl font-bold">{totalWhatsAppResponses}</p>
+                <p className="text-sm text-muted-foreground">WhatsApp</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 bg-green-500/10 rounded-lg">
-                <Phone className="h-6 w-6 text-green-500" />
+              <div className="p-3 bg-purple-500/10 rounded-lg">
+                <Phone className="h-6 w-6 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{totalCallResponses}</p>
+                <p className="text-sm text-muted-foreground">Ligações</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <Users className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{uniqueContacts}</p>
@@ -430,10 +544,11 @@ const Results = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="conversations" className="space-y-4">
+        <Tabs defaultValue="results" className="space-y-4">
           <TabsList>
             <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
-            <TabsTrigger value="conversations">Conversas</TabsTrigger>
+            <TabsTrigger value="results">Resultados</TabsTrigger>
+            <TabsTrigger value="conversations">Conversas WhatsApp</TabsTrigger>
             <TabsTrigger value="webhook">Configurar Webhook</TabsTrigger>
           </TabsList>
 
@@ -491,6 +606,127 @@ const Results = () => {
                       </div>
                     ))}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="results">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Resultados por Canal</span>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar contato..."
+                      className="pl-9"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredResults.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Hash className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground">Nenhum resultado encontrado</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedChannel !== 'all' 
+                        ? `Não há respostas via ${channelConfig[selectedChannel]?.label || selectedChannel}` 
+                        : 'Envie uma campanha para começar a receber respostas'}
+                    </p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[500px]">
+                    <div className="space-y-3">
+                      {filteredResults.map((result) => {
+                        const channel = channelConfig[result.channel_type];
+                        const ChannelIcon = channel?.icon || MessageSquare;
+                        
+                        return (
+                          <div
+                            key={result.id}
+                            className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className={`p-2 rounded-lg ${channel?.color || 'bg-muted'}`}>
+                                <ChannelIcon className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-medium">
+                                      {result.contact_name || result.contact_phone}
+                                    </p>
+                                    {result.contact_name && (
+                                      <p className="text-sm text-muted-foreground">{result.contact_phone}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(result.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                                    </span>
+                                    {result.campaign_name && (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        {result.campaign_name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Content based on channel type */}
+                                {result.channel_type === 'call' ? (
+                                  <div className="mt-2 space-y-2">
+                                    {result.dtmf_response && (
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="font-mono">
+                                          Digitou: {result.dtmf_response}
+                                        </Badge>
+                                        {result.call_duration && (
+                                          <span className="text-xs text-muted-foreground">
+                                            Duração: {Math.floor(result.call_duration / 60)}:{(result.call_duration % 60).toString().padStart(2, '0')}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {result.dtmf_path && result.dtmf_path.length > 0 && (
+                                      <div className="flex items-center gap-1 text-sm">
+                                        <span className="text-muted-foreground">Caminho:</span>
+                                        {result.dtmf_path.map((step, idx) => (
+                                          <span key={idx} className="flex items-center">
+                                            {idx > 0 && <ArrowUpRight className="h-3 w-3 mx-1 text-muted-foreground" />}
+                                            <Badge variant="outline" className="text-xs">
+                                              {step.key}: {step.label}
+                                            </Badge>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {result.call_status && (
+                                      <Badge 
+                                        variant={result.call_status === 'completed' ? 'default' : 'secondary'}
+                                        className="text-xs"
+                                      >
+                                        {result.call_status}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  result.message_content && (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                      {result.message_content}
+                                    </p>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 )}
               </CardContent>
             </Card>
@@ -655,11 +891,11 @@ const Results = () => {
           <TabsContent value="webhook">
             <Card>
               <CardHeader>
-                <CardTitle>Configurar Webhook no Meta</CardTitle>
+                <CardTitle>Configurar Webhooks</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="bg-muted/50 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">URL do Webhook</h3>
+                  <h3 className="font-medium mb-2">URL do Webhook WhatsApp</h3>
                   <div className="flex gap-2">
                     <Input value={webhookUrl} readOnly className="font-mono text-sm" />
                     <Button variant="outline" size="icon" onClick={copyWebhookUrl}>
@@ -668,8 +904,32 @@ const Results = () => {
                   </div>
                 </div>
 
+                <div className="bg-purple-500/10 p-4 rounded-lg border border-purple-500/20">
+                  <h3 className="font-medium mb-2 text-purple-400">URL do Webhook Twilio (Ligações)</h3>
+                  <div className="flex gap-2">
+                    <Input 
+                      value={webhookUrl.replace('whatsapp-webhook', 'twilio-webhook')} 
+                      readOnly 
+                      className="font-mono text-sm" 
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={() => {
+                        navigator.clipboard.writeText(webhookUrl.replace('whatsapp-webhook', 'twilio-webhook'));
+                        toast({ title: "URL copiada!", description: "Configure no n8n para receber DTMF" });
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Configure esta URL no seu workflow n8n para receber as respostas DTMF das ligações.
+                  </p>
+                </div>
+
                 <div className="space-y-4">
-                  <h3 className="font-medium">Como configurar:</h3>
+                  <h3 className="font-medium">Como configurar WhatsApp:</h3>
                   <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
                     <li>
                       Acesse o <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
@@ -695,7 +955,7 @@ const Results = () => {
                   <h4 className="font-medium text-amber-600 mb-2">⚠️ Importante</h4>
                   <p className="text-sm text-muted-foreground">
                     Para receber mensagens de resposta, você precisa configurar o webhook no painel do Meta.
-                    As mensagens recebidas aparecerão automaticamente nesta página.
+                    Para ligações, configure o webhook Twilio no seu workflow n8n.
                   </p>
                 </div>
               </CardContent>

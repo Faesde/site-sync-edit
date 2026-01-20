@@ -45,6 +45,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
 import { CampaignNameModal } from "@/components/CampaignNameModal";
+import { IVRConfigEditor, type IVRMenuItem } from "@/components/IVRConfigEditor";
 import { toast } from "@/hooks/use-toast";
 
 interface Contact {
@@ -108,6 +109,9 @@ const Contacts = () => {
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [uploadedAudioPath, setUploadedAudioPath] = useState<string | null>(null);
+
+  // IVR configuration for calls
+  const [ivrMenuStructure, setIvrMenuStructure] = useState<Array<{ key: string; label: string; submenus?: Array<{ key: string; label: string }> }>>([]);
 
   // WhatsApp template selection
   interface WhatsAppTemplate {
@@ -295,12 +299,13 @@ const Contacts = () => {
         ? prev.filter((a) => a !== actionId)
         : [...prev, actionId]
     );
-    // Se deselecionar "call", limpar o áudio
+    // Se deselecionar "call", limpar o áudio e IVR
     if (actionId === 'call' && selectedActions.includes('call')) {
       setAudioFile(null);
       setAudioFileName(null);
       setAudioError(null);
       setUploadedAudioPath(null);
+      setIvrMenuStructure([]);
     }
   };
 
@@ -457,11 +462,34 @@ const Contacts = () => {
           }
         }
 
+        // Generate a campaign ID for calls if not already generated
+        const callCampaignId = selectedActions.includes('call') && !campaignId
+          ? `campaign_${user?.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+          : campaignId;
+
+        // Save IVR config if call is selected and has menu structure
+        if (selectedActions.includes('call') && ivrMenuStructure.length > 0 && callCampaignId && user) {
+          const { error: ivrError } = await supabaseWiki
+            .from('call_ivr_config')
+            .upsert({
+              user_id: user.id,
+              campaign_id: callCampaignId,
+              menu_structure: ivrMenuStructure,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'campaign_id' });
+
+          if (ivrError) {
+            console.error('Erro ao salvar config IVR:', ivrError);
+          } else {
+            console.log('Config IVR salva para campanha:', callCampaignId);
+          }
+        }
+
         const payload = {
           user_id: user?.id, // ID da conta do usuário logado
           user_email: user?.email, // Email do usuário logado
           actions: selectedActions, // Array com todas as ações: ["whatsapp", "email", "call", "sms"]
-          id_campanha: campaignId, // ID único da campanha (gerado para WhatsApp)
+          id_campanha: campaignId || callCampaignId, // ID único da campanha
           campaign_name: campaignName, // Nome da campanha
           whatsapp_provider: whatsappProvider, // 'evolution' ou 'cloudapi'
           whatsapp_template_id: selectedTemplateId, // ID do template (se Cloud API)
@@ -469,6 +497,8 @@ const Contacts = () => {
           whatsapp_template_body: selectedTemplate?.body_text || null, // Corpo do template
           call_audio_url: callAudioUrl, // URL assinada do áudio (válida por 1 hora)
           call_audio_path: uploadedAudioPath, // Caminho original no storage (backup)
+          call_ivr_menu: ivrMenuStructure.length > 0 ? ivrMenuStructure : null, // Menu IVR
+          call_campaign_id: callCampaignId, // ID da campanha para callback
           contacts: selectedContacts.map((c) => ({
             id: c.id,
             name: c.name,
@@ -973,6 +1003,17 @@ const Contacts = () => {
 
                         {audioError && (
                           <p className="text-sm text-destructive mt-2">{audioError}</p>
+                        )}
+
+                        {/* IVR Configuration */}
+                        {uploadedAudioPath && (
+                          <div className="mt-4">
+                            <IVRConfigEditor
+                              menuStructure={ivrMenuStructure}
+                              onChange={setIvrMenuStructure}
+                              disabled={isUploadingAudio}
+                            />
+                          </div>
                         )}
                       </div>
                     </motion.div>
