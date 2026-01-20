@@ -118,9 +118,14 @@ const Contacts = () => {
   // Call mode: 'audio' (with uploaded audio) or 'tts' (IVR with Text-to-Speech)
   const [callMode, setCallMode] = useState<'audio' | 'tts'>('audio');
 
+  // IVR intro message for TTS mode
+  const [ivrIntroMessage, setIvrIntroMessage] = useState<string>('');
+
   // Audio preview playback
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isPlayingTTSPreview, setIsPlayingTTSPreview] = useState(false);
+  const ttsPreviewRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // WhatsApp template selection
   interface WhatsAppTemplate {
@@ -458,6 +463,57 @@ const Contacts = () => {
     }
   };
 
+  // Generate TTS preview text
+  const getTTSPreviewText = () => {
+    const intro = ivrIntroMessage.trim();
+    const options = ivrMenuStructure
+      .filter((m) => m.key && m.label)
+      .map((m) => `Digite ${m.key} para ${m.label}`)
+      .join('. ');
+    
+    if (intro && options) {
+      return `${intro}. ${options}`;
+    }
+    return intro || options || '';
+  };
+
+  // Toggle TTS preview using Web Speech API
+  const toggleTTSPreview = () => {
+    if (isPlayingTTSPreview) {
+      window.speechSynthesis.cancel();
+      setIsPlayingTTSPreview(false);
+      return;
+    }
+
+    const text = getTTSPreviewText();
+    if (!text) {
+      toast({
+        title: "Nada para reproduzir",
+        description: "Configure a mensagem de introdução ou as opções do menu.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 0.9;
+    
+    utterance.onend = () => {
+      setIsPlayingTTSPreview(false);
+      ttsPreviewRef.current = null;
+    };
+
+    utterance.onerror = () => {
+      setIsPlayingTTSPreview(false);
+      ttsPreviewRef.current = null;
+    };
+
+    ttsPreviewRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setIsPlayingTTSPreview(true);
+  };
+
   // Open campaign modal instead of executing directly
   const handleExecuteClick = () => {
     const selectedContacts = contacts.filter((c) => c.selected);
@@ -570,6 +626,7 @@ const Contacts = () => {
           whatsapp_template_name: selectedTemplate?.name || null, // Nome do template
           whatsapp_template_body: selectedTemplate?.body_text || null, // Corpo do template
           call_mode: callMode, // 'audio' ou 'tts'
+          call_intro_message: callMode === 'tts' ? ivrIntroMessage : null, // Mensagem de introdução para TTS
           call_audio_url: callMode === 'audio' ? callAudioUrl : null, // URL assinada do áudio (válida por 1 hora)
           call_audio_path: callMode === 'audio' ? uploadedAudioPath : null, // Caminho original no storage (backup)
           call_ivr_menu: ivrMenuStructure.length > 0 ? ivrMenuStructure : null, // Menu IVR
@@ -1135,11 +1192,22 @@ const Contacts = () => {
                           </div>
                         )}
 
-                        {/* TTS Mode Info */}
+                        {/* TTS Mode - Intro Message */}
                         {callMode === 'tts' && (
-                          <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                            <p className="text-xs text-blue-300">
-                              💡 O sistema irá gerar automaticamente o áudio com as opções do menu IVR usando Text-to-Speech.
+                          <div className="mb-4 p-3 bg-card/30 rounded-lg border border-border/30">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquare className="w-4 h-4 text-primary" />
+                              <span className="text-xs font-medium text-primary">Mensagem de Introdução</span>
+                            </div>
+                            <textarea
+                              value={ivrIntroMessage}
+                              onChange={(e) => setIvrIntroMessage(e.target.value)}
+                              placeholder="Ex: Olá! Obrigado por atender. Esta é uma pesquisa rápida de satisfação sobre nossos serviços."
+                              className="w-full px-3 py-2 bg-background/50 border border-border/50 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              rows={3}
+                            />
+                            <p className="text-xs text-muted-foreground mt-2">
+                              💡 Esta mensagem será falada antes das opções do menu.
                             </p>
                           </div>
                         )}
@@ -1161,6 +1229,38 @@ const Contacts = () => {
                             </p>
                           )}
                         </div>
+
+                        {/* TTS Preview Section */}
+                        {callMode === 'tts' && (ivrIntroMessage.trim() || ivrMenuStructure.some(m => m.key && m.label)) && (
+                          <div className="mt-4 p-3 bg-muted rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium">Prévia do áudio TTS:</p>
+                              <button
+                                onClick={toggleTTSPreview}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                                  isPlayingTTSPreview 
+                                    ? 'bg-primary/20 text-primary' 
+                                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                }`}
+                              >
+                                {isPlayingTTSPreview ? (
+                                  <>
+                                    <Pause className="w-4 h-4" />
+                                    Parar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play className="w-4 h-4" />
+                                    Ouvir Prévia
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <p className="text-sm text-muted-foreground italic">
+                              "{getTTSPreviewText() || 'Configure a introdução e as opções acima'}"
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   )}
