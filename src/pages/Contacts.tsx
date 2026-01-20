@@ -114,6 +114,9 @@ const Contacts = () => {
 
   // IVR configuration for calls
   const [ivrMenuStructure, setIvrMenuStructure] = useState<Array<{ key: string; label: string; submenus?: Array<{ key: string; label: string }> }>>([]);
+  
+  // Call mode: 'audio' (with uploaded audio) or 'tts' (IVR with Text-to-Speech)
+  const [callMode, setCallMode] = useState<'audio' | 'tts'>('audio');
 
   // Audio preview playback
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -459,9 +462,16 @@ const Contacts = () => {
   const handleExecuteClick = () => {
     const selectedContacts = contacts.filter((c) => c.selected);
     
-    if (selectedActions.includes('call') && !uploadedAudioPath) {
-      setAudioError('Por favor, envie um áudio para a ligação antes de executar.');
-      return;
+    // Validate call configuration
+    if (selectedActions.includes('call')) {
+      if (callMode === 'audio' && !uploadedAudioPath) {
+        setAudioError('Por favor, envie um áudio para a ligação antes de executar.');
+        return;
+      }
+      if (callMode === 'tts' && ivrMenuStructure.length === 0) {
+        setAudioError('Por favor, configure o menu IVR antes de executar.');
+        return;
+      }
     }
     
     if (selectedActions.length > 0 && selectedContacts.length > 0) {
@@ -559,8 +569,9 @@ const Contacts = () => {
           whatsapp_template_id: selectedTemplateId, // ID do template (se Cloud API)
           whatsapp_template_name: selectedTemplate?.name || null, // Nome do template
           whatsapp_template_body: selectedTemplate?.body_text || null, // Corpo do template
-          call_audio_url: callAudioUrl, // URL assinada do áudio (válida por 1 hora)
-          call_audio_path: uploadedAudioPath, // Caminho original no storage (backup)
+          call_mode: callMode, // 'audio' ou 'tts'
+          call_audio_url: callMode === 'audio' ? callAudioUrl : null, // URL assinada do áudio (válida por 1 hora)
+          call_audio_path: callMode === 'audio' ? uploadedAudioPath : null, // Caminho original no storage (backup)
           call_ivr_menu: ivrMenuStructure.length > 0 ? ivrMenuStructure : null, // Menu IVR
           call_campaign_id: callCampaignId, // ID da campanha para callback
           contacts: selectedContacts.map((c) => ({
@@ -1018,87 +1029,138 @@ const Contacts = () => {
                       className="mt-4"
                     >
                       <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Mic className="w-5 h-5 text-purple-400" />
+                        <div className="flex items-center gap-2 mb-4">
+                          <Phone className="w-5 h-5 text-purple-400" />
                           <h3 className="text-sm font-semibold text-purple-300">
-                            Áudio para Ligação
+                            Configuração da Ligação
                           </h3>
-                          <span className="text-xs text-muted-foreground">(máx. 1 minuto)</span>
                         </div>
 
-                        <input
-                          ref={audioInputRef}
-                          type="file"
-                          accept="audio/*"
-                          onChange={handleAudioUpload}
-                          className="hidden"
-                        />
-
-                        {!audioFileName ? (
+                        {/* Mode Selection */}
+                        <div className="flex gap-2 mb-4">
                           <button
-                            onClick={() => audioInputRef.current?.click()}
-                            disabled={isUploadingAudio}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg transition-all duration-200 text-purple-300"
+                            onClick={() => setCallMode('audio')}
+                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-all duration-200 ${
+                              callMode === 'audio'
+                                ? 'bg-purple-500/30 border-purple-500/60 text-purple-200'
+                                : 'bg-card/30 border-border/50 text-muted-foreground hover:border-purple-500/40'
+                            }`}
                           >
                             <Music className="w-4 h-4" />
-                            <span className="text-sm">Enviar Áudio</span>
+                            <span className="text-sm">Com Áudio</span>
                           </button>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 bg-purple-500/20 text-purple-300 px-4 py-2 rounded-lg">
-                              <Music className="w-4 h-4" />
-                              <span className="text-sm font-medium truncate max-w-[200px]">
-                                {audioFileName}
-                              </span>
-                              {isUploadingAudio ? (
-                                <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin" />
-                              ) : uploadedAudioPath ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                              ) : null}
+                          <button
+                            onClick={() => setCallMode('tts')}
+                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-all duration-200 ${
+                              callMode === 'tts'
+                                ? 'bg-purple-500/30 border-purple-500/60 text-purple-200'
+                                : 'bg-card/30 border-border/50 text-muted-foreground hover:border-purple-500/40'
+                            }`}
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span className="text-sm">Só Menu IVR (TTS)</span>
+                          </button>
+                        </div>
+
+                        {/* Audio Upload Section - Only for 'audio' mode */}
+                        {callMode === 'audio' && (
+                          <div className="mb-4 p-3 bg-card/30 rounded-lg border border-border/30">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Mic className="w-4 h-4 text-purple-400" />
+                              <span className="text-xs font-medium text-purple-300">Áudio (máx. 1 minuto)</span>
                             </div>
-                            
-                            {/* Play/Pause Button */}
-                            {uploadedAudioPath && !isUploadingAudio && (
+
+                            <input
+                              ref={audioInputRef}
+                              type="file"
+                              accept="audio/*"
+                              onChange={handleAudioUpload}
+                              className="hidden"
+                            />
+
+                            {!audioFileName ? (
                               <button
-                                onClick={toggleAudioPreview}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  isPlayingAudio 
-                                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
-                                    : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300'
-                                }`}
-                                title={isPlayingAudio ? 'Pausar áudio' : 'Ouvir áudio'}
+                                onClick={() => audioInputRef.current?.click()}
+                                disabled={isUploadingAudio}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 rounded-lg transition-all duration-200 text-purple-300"
                               >
-                                {isPlayingAudio ? (
-                                  <Pause className="w-4 h-4" />
-                                ) : (
-                                  <Play className="w-4 h-4" />
-                                )}
+                                <Music className="w-4 h-4" />
+                                <span className="text-sm">Enviar Áudio</span>
                               </button>
+                            ) : (
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 bg-purple-500/20 text-purple-300 px-4 py-2 rounded-lg">
+                                  <Music className="w-4 h-4" />
+                                  <span className="text-sm font-medium truncate max-w-[200px]">
+                                    {audioFileName}
+                                  </span>
+                                  {isUploadingAudio ? (
+                                    <div className="w-4 h-4 border-2 border-purple-300/30 border-t-purple-300 rounded-full animate-spin" />
+                                  ) : uploadedAudioPath ? (
+                                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                  ) : null}
+                                </div>
+                                
+                                {/* Play/Pause Button */}
+                                {uploadedAudioPath && !isUploadingAudio && (
+                                  <button
+                                    onClick={toggleAudioPreview}
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      isPlayingAudio 
+                                        ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                                        : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300'
+                                    }`}
+                                    title={isPlayingAudio ? 'Pausar áudio' : 'Ouvir áudio'}
+                                  >
+                                    {isPlayingAudio ? (
+                                      <Pause className="w-4 h-4" />
+                                    ) : (
+                                      <Play className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={removeAudio}
+                                  className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
+                                >
+                                  <X className="w-4 h-4 text-destructive" />
+                                </button>
+                              </div>
                             )}
 
-                            <button
-                              onClick={removeAudio}
-                              className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
-                            >
-                              <X className="w-4 h-4 text-destructive" />
-                            </button>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              💡 O áudio deve conter as opções faladas. O menu IVR abaixo serve para mapear as respostas.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* TTS Mode Info */}
+                        {callMode === 'tts' && (
+                          <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                            <p className="text-xs text-blue-300">
+                              💡 O sistema irá gerar automaticamente o áudio com as opções do menu IVR usando Text-to-Speech.
+                            </p>
                           </div>
                         )}
 
                         {audioError && (
-                          <p className="text-sm text-destructive mt-2">{audioError}</p>
+                          <p className="text-sm text-destructive mb-3">{audioError}</p>
                         )}
 
-                        {/* IVR Configuration */}
-                        {uploadedAudioPath && (
-                          <div className="mt-4">
-                            <IVRConfigEditor
-                              menuStructure={ivrMenuStructure}
-                              onChange={setIvrMenuStructure}
-                              disabled={isUploadingAudio}
-                            />
-                          </div>
-                        )}
+                        {/* IVR Configuration - Always visible */}
+                        <div className="mt-2">
+                          <IVRConfigEditor
+                            menuStructure={ivrMenuStructure}
+                            onChange={setIvrMenuStructure}
+                            disabled={isUploadingAudio}
+                          />
+                          {callMode === 'audio' && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Configure as opções para mapear as respostas DTMF nos resultados.
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   )}
