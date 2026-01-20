@@ -121,6 +121,9 @@ const Contacts = () => {
   // IVR intro message for TTS mode
   const [ivrIntroMessage, setIvrIntroMessage] = useState<string>('');
 
+  // IVR variable mappings (reusing VariableMapping type from WhatsApp)
+  const [ivrVariableMappings, setIvrVariableMappings] = useState<VariableMapping[]>([]);
+
   // Audio preview playback
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -175,6 +178,26 @@ const Contacts = () => {
       setVariableMappings([]);
     }
   }, [selectedTemplateId, whatsappTemplates]);
+
+  // Update IVR variable mappings when intro message changes
+  useEffect(() => {
+    const variables = extractTemplateVariables(ivrIntroMessage);
+    if (variables.length > 0) {
+      // Preserve existing mappings if they exist
+      const newMappings: VariableMapping[] = variables.map((v, index) => {
+        const existing = ivrVariableMappings.find(m => m.variable === v);
+        if (existing) return existing;
+        return {
+          variable: v,
+          source: index === 0 ? 'name' : 'custom',
+          customValue: '',
+        };
+      });
+      setIvrVariableMappings(newMappings);
+    } else {
+      setIvrVariableMappings([]);
+    }
+  }, [ivrIntroMessage]);
 
   // Aguarda carregar profile/role antes de decidir acesso
   const isLoadingAccess = loading || (user && role === null);
@@ -627,6 +650,9 @@ const Contacts = () => {
           whatsapp_template_body: selectedTemplate?.body_text || null, // Corpo do template
           call_mode: callMode, // 'audio' ou 'tts'
           call_intro_message: callMode === 'tts' ? ivrIntroMessage : null, // Mensagem de introdução para TTS
+          call_ivr_variable_mappings: callMode === 'tts' && ivrVariableMappings.length > 0 
+            ? ivrVariableMappings.map(m => ({ variable: m.variable, source: m.source, customValue: m.customValue }))
+            : null, // Mapeamento de variáveis para TTS
           call_audio_url: callMode === 'audio' ? callAudioUrl : null, // URL assinada do áudio (válida por 1 hora)
           call_audio_path: callMode === 'audio' ? uploadedAudioPath : null, // Caminho original no storage (backup)
           call_ivr_menu: ivrMenuStructure.length > 0 ? ivrMenuStructure : null, // Menu IVR
@@ -1195,20 +1221,87 @@ const Contacts = () => {
                         {/* TTS Mode - Intro Message */}
                         {callMode === 'tts' && (
                           <div className="mb-4 p-3 bg-card/30 rounded-lg border border-border/30">
-                            <div className="flex items-center gap-2 mb-2">
-                              <MessageSquare className="w-4 h-4 text-primary" />
-                              <span className="text-xs font-medium text-primary">Mensagem de Introdução</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4 text-primary" />
+                                <span className="text-xs font-medium text-primary">Mensagem de Introdução</span>
+                              </div>
+                              {/* Quick insert buttons */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground mr-1">Inserir:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextVar = extractTemplateVariables(ivrIntroMessage).length + 1;
+                                    setIvrIntroMessage(prev => prev + `{{${nextVar}}}`);
+                                  }}
+                                  className="px-2 py-0.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                                  title="Adicionar variável"
+                                >
+                                  + Variável
+                                </button>
+                              </div>
                             </div>
                             <textarea
                               value={ivrIntroMessage}
                               onChange={(e) => setIvrIntroMessage(e.target.value)}
-                              placeholder="Ex: Olá! Obrigado por atender. Esta é uma pesquisa rápida de satisfação sobre nossos serviços."
+                              placeholder="Ex: Olá {{1}}, tudo bem? Estamos fazendo uma pesquisa eleitoral..."
                               className="w-full px-3 py-2 bg-background/50 border border-border/50 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                               rows={3}
                             />
                             <p className="text-xs text-muted-foreground mt-2">
-                              💡 Esta mensagem será falada antes das opções do menu.
+                              💡 Use {"{{1}}"}, {"{{2}}"}, etc. para inserir dados do contato. Ex: "Olá {"{{1}}"}" será substituído pelo nome.
                             </p>
+
+                            {/* IVR Variable Mapping */}
+                            {ivrVariableMappings.length > 0 && (
+                              <div className="mt-3 p-3 bg-accent/30 rounded-lg border border-accent/50">
+                                <p className="text-xs text-accent-foreground font-medium mb-3 flex items-center gap-2">
+                                  <span className="w-2 h-2 bg-accent rounded-full animate-pulse"></span>
+                                  Mapeie cada variável:
+                                </p>
+                                <div className="space-y-2">
+                                  {ivrVariableMappings.map((mapping, index) => (
+                                    <div key={mapping.variable} className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded text-primary min-w-[50px] text-center">
+                                        {mapping.variable}
+                                      </span>
+                                      <span className="text-muted-foreground text-sm">=</span>
+                                      <Select
+                                        value={mapping.source}
+                                        onValueChange={(value: VariableSource) => {
+                                          const newMappings = [...ivrVariableMappings];
+                                          newMappings[index] = { ...mapping, source: value };
+                                          setIvrVariableMappings(newMappings);
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[140px] bg-card/50 border-primary/30">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="name">Nome</SelectItem>
+                                          <SelectItem value="phone">Telefone</SelectItem>
+                                          <SelectItem value="email">E-mail</SelectItem>
+                                          <SelectItem value="custom">Texto fixo</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {mapping.source === 'custom' && (
+                                        <Input
+                                          placeholder="Valor fixo"
+                                          className="flex-1 min-w-[120px] bg-card/50 border-primary/30"
+                                          value={mapping.customValue || ''}
+                                          onChange={(e) => {
+                                            const newMappings = [...ivrVariableMappings];
+                                            newMappings[index] = { ...mapping, customValue: e.target.value };
+                                            setIvrVariableMappings(newMappings);
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
