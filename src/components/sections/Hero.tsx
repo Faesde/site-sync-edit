@@ -104,13 +104,13 @@ export const Hero = () => {
             >
               <Link to="/login">
                 <Button size="xl" className="bg-accent text-white hover:brightness-110 shadow-accent group">
-                  Testar grátis por 7 dias
+                  Começar agora
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
               <Button size="lg" variant="outlineLight" className="group">
                 <Zap className="w-5 h-5" />
-                Ver demonstração
+                Fale com um especialista
               </Button>
             </motion.div>
 
