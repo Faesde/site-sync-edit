@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { parseContactsFile } from "@/lib/contactsImport";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
@@ -835,6 +836,7 @@ const Contacts = () => {
             <span className="text-muted-foreground">Gerenciador de Contatos</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            <ThemeToggle />
             {/* Atalho visível para Resultados (evita depender do dropdown) */}
             <Button
               variant="outline"

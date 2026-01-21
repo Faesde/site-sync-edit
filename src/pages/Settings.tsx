@@ -508,6 +508,7 @@ const Settings = () => {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="text-right">
               <p className="text-sm font-medium text-foreground">
                 {profile?.full_name || user?.email}
