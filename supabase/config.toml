@@ -26,3 +26,18 @@ verify_jwt = false
 
 [functions.n8n-webhook]
 verify_jwt = false
+
+[functions.evolution-create-instance]
+verify_jwt = false
+
+[functions.evolution-get-instances]
+verify_jwt = false
+
+[functions.evolution-get-qrcode]
+verify_jwt = false
+
+[functions.evolution-check-status]
+verify_jwt = false
+
+[functions.evolution-delete-instance]
+verify_jwt = false
