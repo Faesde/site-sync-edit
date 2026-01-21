@@ -1,21 +1,13 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-
-const benefits = [
-  "Teste grátis por 7 dias",
-  "Sem necessidade de cartão",
-  "Suporte especializado",
-  "Resultados em minutos",
-];
+import { ArrowRight, MessageCircle } from "lucide-react";
 
 export const CTA = () => {
   return (
-    <section className="py-24 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-hero opacity-95" />
+    <section className="py-24 relative overflow-hidden bg-gradient-hero">
+      {/* Background Elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary-foreground/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/5 rounded-full blur-3xl" />
       </div>
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
@@ -25,47 +17,32 @@ export const CTA = () => {
           viewport={{ once: true }}
           className="max-w-4xl mx-auto text-center"
         >
-          <h2 className="font-display text-3xl md:text-5xl lg:text-6xl font-bold text-primary-foreground mb-6">
-            Pronto para transformar seus resultados?
+          <h2 className="font-display text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
+            Descubra o porquê a{" "}
+            <span className="text-accent">Wiki Marketing é a ferramenta certa</span>{" "}
+            para o seu negócio!
           </h2>
 
-          <p className="text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto">
-            Comece agora mesmo e descubra como a Wiki Marketing pode ajudar você 
-            a alcançar mais leads e vender muito mais.
+          <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+            Fale conosco e tire todas as suas dúvidas. Nossa equipe está pronta para ajudar você a crescer.
           </p>
-
-          {/* Benefits */}
-          <div className="flex flex-wrap justify-center gap-6 mb-10">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={benefit}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-                <span className="text-primary-foreground font-medium">{benefit}</span>
-              </motion.div>
-            ))}
-          </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               size="xl"
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-lg hover:shadow-xl transition-all group"
+              className="bg-accent text-accent-foreground hover:brightness-110 shadow-lg hover:shadow-xl transition-all group"
             >
-              Começar teste grátis
+              Começar agora mesmo!
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Button>
             <Button
               size="lg"
-              variant="outline"
-              className="border-2 border-primary-foreground text-primary-foreground bg-transparent hover:bg-primary-foreground/10"
+              variant="outlineLight"
+              className="group"
             >
-              Falar com especialista
+              <MessageCircle className="w-5 h-5" />
+              Fale conosco
             </Button>
           </div>
         </motion.div>
