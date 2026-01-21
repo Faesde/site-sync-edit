@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navLinks = [
   { label: "Início", href: "/", isRoute: true },
@@ -93,6 +94,7 @@ export const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-4">
+            <ThemeToggle />
             {loading ? (
               <div className="w-8 h-8 rounded-full bg-white/20 animate-pulse" />
             ) : user ? (
@@ -200,6 +202,10 @@ export const Header = () => {
                   </a>
                 )
               )}
+              <div className="flex items-center justify-between py-2">
+                <span className="text-white/80 font-medium">Tema</span>
+                <ThemeToggle />
+              </div>
               <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
                 {user ? (
                   <>
