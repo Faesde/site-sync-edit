@@ -4,6 +4,7 @@ import { Check, Crown, Zap, Shield, AlertCircle, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
  
 const plans = [
   {
@@ -96,15 +97,16 @@ const Plans = () => {
       </div>
 
       <div className="relative container mx-auto px-4 py-12">
-        {/* Logout Button - só mostra se logado */}
-        {user && (
-          <div className="absolute top-4 right-4">
+        {/* Top Actions */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <ThemeToggle />
+          {user && (
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Header */}
         <motion.div
