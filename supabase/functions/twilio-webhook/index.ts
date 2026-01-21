@@ -127,11 +127,12 @@ Deno.serve(async (req) => {
     }
 
     // Insert result into campaign_results
+    // Note: campaign_id is stored as text, not UUID
     const { error: insertError } = await supabase
       .from('campaign_results')
       .insert({
         user_id: userId,
-        campaign_id: campaignId,
+        campaign_id: campaignId || null,
         campaign_name: campaignName,
         channel_type: 'call',
         contact_phone: from,
