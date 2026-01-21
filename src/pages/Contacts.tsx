@@ -592,16 +592,19 @@ const Contacts = () => {
           ? whatsappTemplates.find(t => t.id === selectedTemplateId)
           : null;
 
-        // Create campaign record in database
-        if (campaignId && user) {
+        // Generate a unified campaign ID for all actions
+        const unifiedCampaignId = `campaign_${user?.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+        // Create campaign record in database for ALL campaign types
+        if (user) {
           const { error: campaignError } = await supabaseWiki
             .from('whatsapp_campaigns')
             .insert({
-              id: campaignId,
+              id: unifiedCampaignId,
               user_id: user.id,
               name: campaignName,
-              template_id: selectedTemplateId || null,
-              template_name: selectedTemplate?.name || null,
+              template_id: selectedActions.includes('whatsapp') ? (selectedTemplateId || null) : null,
+              template_name: selectedActions.includes('whatsapp') ? (selectedTemplate?.name || null) : (selectedActions.includes('call') ? 'Ligação' : null),
               contacts_count: selectedContacts.length,
             });
           
@@ -616,10 +619,8 @@ const Contacts = () => {
           }
         }
 
-        // Generate a campaign ID for calls if not already generated
-        const callCampaignId = selectedActions.includes('call') && !campaignId
-          ? `campaign_${user?.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          : campaignId;
+        // Use the unified campaign ID for calls
+        const callCampaignId = unifiedCampaignId;
 
         // Save IVR config if call is selected and has menu structure
         if (selectedActions.includes('call') && ivrMenuStructure.length > 0 && callCampaignId && user) {
@@ -643,7 +644,7 @@ const Contacts = () => {
           user_id: user?.id, // ID da conta do usuário logado
           user_email: user?.email, // Email do usuário logado
           actions: selectedActions, // Array com todas as ações: ["whatsapp", "email", "call", "sms"]
-          id_campanha: campaignId || callCampaignId, // ID único da campanha
+          id_campanha: unifiedCampaignId, // ID único da campanha
           campaign_name: campaignName, // Nome da campanha
           whatsapp_provider: whatsappProvider, // 'evolution' ou 'cloudapi'
           whatsapp_template_id: selectedTemplateId, // ID do template (se Cloud API)
@@ -694,7 +695,7 @@ const Contacts = () => {
                 Authorization: `Bearer ${session.access_token}`,
               },
               body: {
-                campaign_id: campaignId,
+                campaign_id: unifiedCampaignId,
                 contacts: whatsappContacts,
                 template_name: selectedTemplate?.name || null,
                 template_body: selectedTemplate?.body_text || 'Olá!',
