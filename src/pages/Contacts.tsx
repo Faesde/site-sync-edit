@@ -780,19 +780,88 @@ const Contacts = () => {
           } catch (error) {
             console.error('Erro ao enviar WhatsApp via Edge Function:', error);
           }
-        } else if (selectedActions.includes('whatsapp')) {
-          // Fallback para n8n se não for Cloud API
-          const whatsappWebhook = "https://n8neditor.faesde.com.br/webhook/15f0c5d3-49d2-4bbb-b318-704d016cbbd5";
-          const whatsappResponse = await fetch(whatsappWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+        } else if (selectedActions.includes('whatsapp') && whatsappProvider === 'evolution') {
+          // Send via Evolution API Edge Function
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              console.error('Sessão expirada');
+              toast({
+                title: "Erro",
+                description: "Sessão expirada. Faça login novamente.",
+                variant: "destructive"
+              });
+              return;
+            }
 
-          if (!whatsappResponse.ok) {
-            console.error("Erro ao enviar para webhook WhatsApp:", whatsappResponse.statusText);
-          } else {
-            console.log("Campanha WhatsApp enviada com sucesso! ID:", campaignId);
+            // Get message body from template or custom message
+            let messageBody = '';
+            if (evolutionMessageMode === 'template' && selectedEvolutionTemplateId) {
+              const selectedEvTemplate = evolutionTemplates.find(t => t.id === selectedEvolutionTemplateId);
+              messageBody = selectedEvTemplate?.content || '';
+            } else if (evolutionMessageMode === 'custom') {
+              messageBody = evolutionCustomMessage;
+            }
+
+            if (!messageBody) {
+              toast({
+                title: "Erro",
+                description: "Nenhuma mensagem definida. Selecione um template ou escreva uma mensagem.",
+                variant: "destructive"
+              });
+              return;
+            }
+
+            if (!selectedEvolutionInstanceId) {
+              toast({
+                title: "Erro",
+                description: "Selecione uma instância do WhatsApp para enviar.",
+                variant: "destructive"
+              });
+              return;
+            }
+
+            const evolutionContacts = selectedContacts.map(c => ({
+              name: c.name,
+              phone: c.phone,
+              email: c.email,
+            }));
+
+            const response = await supabase.functions.invoke('evolution-send-message', {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: {
+                instance_id: selectedEvolutionInstanceId,
+                campaign_id: unifiedCampaignId,
+                contacts: evolutionContacts,
+                message_body: messageBody,
+                template_id: selectedEvolutionTemplateId,
+              },
+            });
+
+            if (response.error) {
+              console.error('Erro ao enviar WhatsApp Evolution:', response.error);
+              toast({
+                title: "Erro no envio",
+                description: response.error.message,
+                variant: "destructive"
+              });
+            } else {
+              console.log('Campanha Evolution enviada!', response.data);
+              
+              toast({
+                title: "Campanha enviada!",
+                description: `${response.data.sent} mensagens enviadas com sucesso.${response.data.failed > 0 ? ` ${response.data.failed} falharam.` : ''}`,
+              });
+            }
+          } catch (error) {
+            console.error('Erro ao enviar WhatsApp via Evolution:', error);
+            toast({
+              title: "Erro",
+              description: "Erro ao enviar mensagens. Tente novamente.",
+              variant: "destructive"
+            });
           }
         }
 
