@@ -260,7 +260,7 @@ const Settings = () => {
     
     setIsLoadingInstances(true);
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-get-instances');
+      const { data, error } = await supabase.functions.invoke('evolution-get-instances-index-ts');
       
       if (error) throw error;
       
@@ -387,7 +387,7 @@ const Settings = () => {
 
     setIsCreatingInstance(true);
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-create-instance', {
+      const { data, error } = await supabase.functions.invoke('evolution-create-instance-index-ts', {
         body: {
           instance_name: newInstanceName.trim(),
           display_name: newInstanceDisplayName.trim() || newInstanceName.trim()
@@ -428,7 +428,7 @@ const Settings = () => {
     setCurrentQrCode(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-get-qrcode', {
+      const { data, error } = await supabase.functions.invoke('evolution-get-qrcode-index-ts', {
         body: { instance_id: instance.id }
       });
 
@@ -458,7 +458,7 @@ const Settings = () => {
 
   const handleCheckStatus = async (instance: EvolutionInstance) => {
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-check-status', {
+      const { data, error } = await supabase.functions.invoke('evolution-check-status-index-ts', {
         body: { instance_id: instance.id }
       });
 
@@ -481,7 +481,7 @@ const Settings = () => {
     if (!deleteInstanceId) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-delete-instance', {
+      const { data, error } = await supabase.functions.invoke('evolution-delete-instance-index-ts', {
         body: { instance_id: deleteInstanceId }
       });
 
