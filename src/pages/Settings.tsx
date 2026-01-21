@@ -338,12 +338,15 @@ const Settings = () => {
 
     setIsSavingConfig(true);
     try {
+      // Preserve existing values for both providers - only update the selected provider's fields
       const configData = {
         provider,
         evolution_instance_name: null, // No longer used, we have multiple instances
-        cloudapi_phone_number_id: provider === 'cloudapi' ? cloudapiPhoneId : null,
-        cloudapi_business_account_id: provider === 'cloudapi' ? cloudapiBusinessId : null,
-        cloudapi_access_token: provider === 'cloudapi' ? cloudapiAccessToken : null,
+        // Always send Cloud API values (preserve existing if not editing)
+        cloudapi_phone_number_id: cloudapiPhoneId || config?.cloudapi_phone_number_id || null,
+        cloudapi_business_account_id: cloudapiBusinessId || config?.cloudapi_business_account_id || null,
+        // Only send access token if user entered a new one (for Cloud API)
+        cloudapi_access_token: provider === 'cloudapi' && cloudapiAccessToken ? cloudapiAccessToken : undefined,
       };
 
       const { data, error } = await supabase.functions.invoke('save-whatsapp-config', {
