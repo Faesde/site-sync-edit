@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, User, LogOut, Settings, LayoutDashboard, MessageSquare } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, LayoutDashboard, MessageSquare, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,10 +14,10 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navLinks = [
-  { label: "Soluções", href: "#solucoes", isRoute: false },
+  { label: "Início", href: "/", isRoute: true },
+  { label: "Funcionalidades", href: "#ferramentas", isRoute: false },
   { label: "Planos", href: "/plans", isRoute: true },
-  { label: "Sobre nós", href: "#sobre", isRoute: false },
-  { label: "Blog", href: "#blog", isRoute: false },
+  { label: "Integrações", href: "#integracoes", isRoute: false },
 ];
 
 export const Header = () => {
@@ -48,18 +48,25 @@ export const Header = () => {
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-secondary text-white">
+      {/* Top Banner */}
+      <div className="bg-primary text-center py-2 px-4">
+        <p className="text-sm">
+          Revolucione a forma de se comunicar com o seu cliente.{" "}
+          <Link to="/login" className="font-semibold underline hover:no-underline">
+            Comece agora mesmo!
+          </Link>
+        </p>
+      </div>
+
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-hero flex items-center justify-center">
-              <span className="text-primary-foreground font-display font-bold text-xl">W</span>
-            </div>
-            <span className="font-display font-bold text-xl text-foreground">
-              Wiki<span className="text-gradient-primary">Marketing</span>
+          <Link to="/" className="flex items-center gap-2">
+            <span className="font-display font-bold text-2xl text-white">
+              Wiki<span className="text-accent">Marketing</span>
             </span>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-8">
@@ -68,7 +75,7 @@ export const Header = () => {
                 <Link
                   key={link.label}
                   to={link.href}
-                  className="text-muted-foreground hover:text-primary transition-colors font-medium"
+                  className="text-white/80 hover:text-white transition-colors font-medium"
                 >
                   {link.label}
                 </Link>
@@ -76,7 +83,7 @@ export const Header = () => {
                 <a
                   key={link.label}
                   href={link.href}
-                  className="text-muted-foreground hover:text-primary transition-colors font-medium"
+                  className="text-white/80 hover:text-white transition-colors font-medium"
                 >
                   {link.label}
                 </a>
@@ -87,19 +94,20 @@ export const Header = () => {
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-4">
             {loading ? (
-              <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+              <div className="w-8 h-8 rounded-full bg-white/20 animate-pulse" />
             ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 px-2">
+                  <Button variant="ghost" className="flex items-center gap-2 px-2 text-white hover:bg-white/10">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                      <AvatarFallback className="bg-accent text-white text-sm">
                         {getInitials()}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-sm font-medium max-w-[120px] truncate">
                       {displayName}
                     </span>
+                    <ChevronDown className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -138,21 +146,21 @@ export const Header = () => {
               </DropdownMenu>
             ) : (
               <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    Login
-                  </Button>
-                </Link>
                 <Button variant="hero" size="default">
                   Começar agora
                 </Button>
+                <Link to="/login">
+                  <Button variant="outlineLight" size="default">
+                    Login
+                  </Button>
+                </Link>
               </>
             )}
           </div>
 
           {/* Mobile Menu Button */}
           <button
-            className="lg:hidden p-2 text-foreground"
+            className="lg:hidden p-2 text-white"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -168,7 +176,7 @@ export const Header = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-background border-b border-border"
+            className="lg:hidden bg-secondary border-t border-white/10"
           >
             <nav className="container mx-auto px-4 py-6 flex flex-col gap-4">
               {navLinks.map((link) =>
@@ -176,7 +184,7 @@ export const Header = () => {
                   <Link
                     key={link.label}
                     to={link.href}
-                    className="text-foreground hover:text-primary transition-colors font-medium py-2"
+                    className="text-white hover:text-accent transition-colors font-medium py-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.label}
@@ -185,41 +193,41 @@ export const Header = () => {
                   <a
                     key={link.label}
                     href={link.href}
-                    className="text-foreground hover:text-primary transition-colors font-medium py-2"
+                    className="text-white hover:text-accent transition-colors font-medium py-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.label}
                   </a>
                 )
               )}
-              <div className="flex flex-col gap-3 pt-4 border-t border-border">
+              <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
                 {user ? (
                   <>
                     <div className="flex items-center gap-3 px-2 py-2">
                       <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary text-primary-foreground">
+                        <AvatarFallback className="bg-accent text-white">
                           {getInitials()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{displayName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-sm font-medium text-white truncate">{displayName}</p>
+                        <p className="text-xs text-white/60 truncate">{user.email}</p>
                       </div>
                     </div>
                     <Link to="/contacts" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" className="w-full justify-start gap-2">
+                      <Button variant="outlineLight" className="w-full justify-start gap-2">
                         <LayoutDashboard className="h-4 w-4" />
                         Dashboard
                       </Button>
                     </Link>
                     <Link to="/results" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" className="w-full justify-start gap-2">
+                      <Button variant="outlineLight" className="w-full justify-start gap-2">
                         <MessageSquare className="h-4 w-4" />
                         Resultados
                       </Button>
                     </Link>
                     <Link to="/settings" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" className="w-full justify-start gap-2">
+                      <Button variant="outlineLight" className="w-full justify-start gap-2">
                         <Settings className="h-4 w-4" />
                         Configurações
                       </Button>
@@ -238,14 +246,14 @@ export const Header = () => {
                   </>
                 ) : (
                   <>
-                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" className="w-full">
-                        Login
-                      </Button>
-                    </Link>
                     <Button variant="hero" className="w-full">
                       Começar agora
                     </Button>
+                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outlineLight" className="w-full">
+                        Login
+                      </Button>
+                    </Link>
                   </>
                 )}
               </div>
