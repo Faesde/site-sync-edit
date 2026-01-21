@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
         campaign_id: campaignId || null,
         campaign_name: campaignName,
         channel_type: 'call',
-        contact_phone: from,
+        contact_phone: to, // "to" is the contact who received the call
         dtmf_response: digits || null,
         dtmf_path: dtmfPath,
         call_duration: callDuration,
