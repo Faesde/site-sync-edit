@@ -142,6 +142,26 @@ const Contacts = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [whatsappProvider, setWhatsappProvider] = useState<string | null>(null);
   
+  // Evolution API state
+  interface EvolutionInstance {
+    id: string;
+    instance_name: string;
+    display_name: string | null;
+    phone_number: string | null;
+    status: string;
+  }
+  interface EvolutionTemplate {
+    id: string;
+    name: string;
+    content: string;
+  }
+  const [evolutionInstances, setEvolutionInstances] = useState<EvolutionInstance[]>([]);
+  const [evolutionTemplates, setEvolutionTemplates] = useState<EvolutionTemplate[]>([]);
+  const [selectedEvolutionInstanceId, setSelectedEvolutionInstanceId] = useState<string | null>(null);
+  const [selectedEvolutionTemplateId, setSelectedEvolutionTemplateId] = useState<string | null>(null);
+  const [evolutionCustomMessage, setEvolutionCustomMessage] = useState('');
+  const [evolutionMessageMode, setEvolutionMessageMode] = useState<'template' | 'custom'>('template');
+  
   // Variable mapping for templates
   type VariableSource = 'name' | 'phone' | 'email' | 'custom';
   interface VariableMapping {
@@ -231,9 +251,36 @@ const Contacts = () => {
         
         if (configData) {
           setWhatsappProvider(configData.provider);
+          
+          // If Evolution provider, load instances and templates
+          if (configData.provider === 'evolution') {
+            // Load Evolution instances
+            const { data: instancesResponse } = await supabase.functions.invoke('evolution-get-instances-index-ts');
+            if (instancesResponse?.success && instancesResponse?.instances) {
+              const connectedInstances = instancesResponse.instances.filter(
+                (inst: EvolutionInstance) => inst.status === 'connected'
+              );
+              setEvolutionInstances(connectedInstances);
+              // Auto-select first connected instance
+              if (connectedInstances.length > 0 && !selectedEvolutionInstanceId) {
+                setSelectedEvolutionInstanceId(connectedInstances[0].id);
+              }
+            }
+            
+            // Load Evolution templates
+            const { data: evoTemplatesData } = await supabaseWiki
+              .from('evolution_templates')
+              .select('id, name, content')
+              .eq('user_id', user.id)
+              .order('name');
+            
+            if (evoTemplatesData) {
+              setEvolutionTemplates(evoTemplatesData);
+            }
+          }
         }
 
-        // Load approved templates
+        // Load approved Meta templates (for Cloud API)
         const { data: templatesData } = await supabaseWiki
           .from('whatsapp_templates')
           .select('id, name, body_text, status')
@@ -1101,6 +1148,183 @@ const Contacts = () => {
                             )}
                           </div>
                         )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Evolution API WhatsApp Options */}
+                <AnimatePresence>
+                  {selectedActions.includes('whatsapp') && whatsappProvider === 'evolution' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4"
+                    >
+                      <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MessageCircle className="w-5 h-5 text-green-400" />
+                          <h3 className="text-sm font-semibold text-green-300">
+                            Mensagem via Evolution API
+                          </h3>
+                        </div>
+
+                        {evolutionInstances.length === 0 ? (
+                          <div className="text-sm text-muted-foreground">
+                            <p>Nenhuma instância conectada disponível.</p>
+                            <Button 
+                              variant="link" 
+                              className="text-green-400 p-0 h-auto"
+                              onClick={() => navigate('/settings')}
+                            >
+                              Conectar WhatsApp nas Configurações
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {/* Instance Selection */}
+                            <div>
+                              <Label className="text-xs text-green-300 mb-2 block">Enviar de:</Label>
+                              <Select 
+                                value={selectedEvolutionInstanceId || ''} 
+                                onValueChange={setSelectedEvolutionInstanceId}
+                              >
+                                <SelectTrigger className="bg-green-500/10 border-green-500/30 text-green-300">
+                                  <SelectValue placeholder="Selecione uma instância" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {evolutionInstances.map((instance) => (
+                                    <SelectItem key={instance.id} value={instance.id}>
+                                      {instance.display_name || instance.instance_name}
+                                      {instance.phone_number && ` (${instance.phone_number})`}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Message Mode Toggle */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setEvolutionMessageMode('template')}
+                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 ${
+                                  evolutionMessageMode === 'template'
+                                    ? 'bg-green-500/30 border-green-500/60 text-green-200'
+                                    : 'bg-card/30 border-border/50 text-muted-foreground hover:border-green-500/40'
+                                }`}
+                              >
+                                <FileSpreadsheet className="w-4 h-4" />
+                                <span className="text-sm">Usar Template</span>
+                              </button>
+                              <button
+                                onClick={() => setEvolutionMessageMode('custom')}
+                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200 ${
+                                  evolutionMessageMode === 'custom'
+                                    ? 'bg-green-500/30 border-green-500/60 text-green-200'
+                                    : 'bg-card/30 border-border/50 text-muted-foreground hover:border-green-500/40'
+                                }`}
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                <span className="text-sm">Mensagem Livre</span>
+                              </button>
+                            </div>
+
+                            {/* Template Selection */}
+                            {evolutionMessageMode === 'template' && (
+                              <div>
+                                {evolutionTemplates.length === 0 ? (
+                                  <div className="text-sm text-muted-foreground p-3 bg-card/30 rounded-lg">
+                                    <p>Nenhum template local criado.</p>
+                                    <Button 
+                                      variant="link" 
+                                      className="text-green-400 p-0 h-auto"
+                                      onClick={() => navigate('/settings')}
+                                    >
+                                      Criar templates nas Configurações
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Select 
+                                      value={selectedEvolutionTemplateId || ''} 
+                                      onValueChange={setSelectedEvolutionTemplateId}
+                                    >
+                                      <SelectTrigger className="bg-green-500/10 border-green-500/30 text-green-300">
+                                        <SelectValue placeholder="Selecione um template" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {evolutionTemplates.map((template) => (
+                                          <SelectItem key={template.id} value={template.id}>
+                                            {template.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    
+                                    {selectedEvolutionTemplateId && (
+                                      <div className="mt-3 p-3 bg-card/50 rounded-lg border border-border/50">
+                                        <p className="text-xs text-muted-foreground mb-1">Prévia:</p>
+                                        <p className="text-sm text-foreground whitespace-pre-wrap">
+                                          {evolutionTemplates.find(t => t.id === selectedEvolutionTemplateId)?.content}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Custom Message */}
+                            {evolutionMessageMode === 'custom' && (
+                              <div>
+                                <Label className="text-xs text-green-300 mb-2 block">
+                                  Mensagem (use {'{{1}}'} para Nome, {'{{2}}'} para Telefone):
+                                </Label>
+                                <textarea
+                                  value={evolutionCustomMessage}
+                                  onChange={(e) => setEvolutionCustomMessage(e.target.value)}
+                                  placeholder="Olá {{1}}, tudo bem? Estamos entrando em contato..."
+                                  className="w-full min-h-[100px] p-3 rounded-lg bg-card/50 border border-green-500/30 text-foreground placeholder:text-muted-foreground resize-y"
+                                />
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Variáveis disponíveis: {'{{1}}'} = Nome, {'{{2}}'} = Telefone, {'{{3}}'} = Email
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* No provider configured */}
+                <AnimatePresence>
+                  {selectedActions.includes('whatsapp') && !whatsappProvider && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4"
+                    >
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageCircle className="w-5 h-5 text-yellow-400" />
+                          <h3 className="text-sm font-semibold text-yellow-300">
+                            Configuração Necessária
+                          </h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Você precisa configurar um provedor de WhatsApp antes de enviar mensagens.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10"
+                          onClick={() => navigate('/settings')}
+                        >
+                          Ir para Configurações
+                        </Button>
                       </div>
                     </motion.div>
                   )}
