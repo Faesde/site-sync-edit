@@ -102,16 +102,18 @@ export const Hero = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row items-start gap-4 mb-10"
             >
-              <Link to="/login">
+              <Link to="/register">
                 <Button size="xl" className="bg-accent text-white hover:brightness-110 shadow-accent group">
                   Começar agora
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outlineLight" className="group">
-                <Zap className="w-5 h-5" />
-                Fale com um especialista
-              </Button>
+              <a href="https://wa.me/5511995833281" target="_blank" rel="noopener noreferrer">
+                <Button size="lg" variant="outlineLight" className="group">
+                  <Zap className="w-5 h-5" />
+                  Fale com um especialista
+                </Button>
+              </a>
             </motion.div>
 
             {/* Trust Badges */}
