@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, User, LogOut, Settings, LayoutDashboard, MessageSquare, ChevronDown } from "lucide-react";
+import { Menu, X, LogOut, Settings, LayoutDashboard, MessageSquare, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,14 +11,42 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { cn } from "@/lib/utils";
 
-const navLinks = [
-  { label: "Início", href: "/", isRoute: true },
-  { label: "Funcionalidades", href: "#ferramentas", isRoute: false },
-  { label: "Planos", href: "/plans", isRoute: true },
-  { label: "Integrações", href: "#integracoes", isRoute: false },
+const funcionalidadesLinks = [
+  { label: "Para E-commerce", href: "/industries/ecommerce" },
+  { label: "Para Infoprodutos", href: "/industries/affiliates" },
+  { label: "Para Negócios Locais", href: "/industries/local-business" },
+  { label: "Automação, Campanha e Listas", href: "/features/automation" },
+  { label: "WhatsApp Marketing", href: "/features/whatsapp-marketing" },
+  { label: "E-mail Marketing", href: "/features/email-marketing" },
+  { label: "SMS Marketing", href: "/features/sms-marketing" },
+  { label: "Voz/Ligação Marketing", href: "/features/voice-marketing" },
+  { label: "Todas", href: "/#ferramentas" },
+];
+
+const integracoesLinks = [
+  { label: "Shopify", href: "/integrations/shopify" },
+  { label: "WooCommerce", href: "/integrations/woocommerce" },
+  { label: "Yampi", href: "/integrations/yampi" },
+  { label: "Kiwify", href: "/integrations/kiwify" },
+  { label: "Cartpanda", href: "/integrations/cartpanda" },
+  { label: "Todas", href: "/integrations" },
+];
+
+const ajudaLinks = [
+  { label: "Central de Ajuda", href: "/help" },
+  { label: "Fale Conosco", href: "/contact" },
 ];
 
 export const Header = () => {
@@ -54,7 +82,7 @@ export const Header = () => {
       <div className="bg-primary text-center py-2 px-4">
         <p className="text-sm">
           Revolucione a forma de se comunicar com o seu cliente.{" "}
-          <Link to="/login" className="font-semibold underline hover:no-underline">
+          <Link to="/register" className="font-semibold underline hover:no-underline">
             Comece agora mesmo!
           </Link>
         </p>
@@ -70,27 +98,99 @@ export const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) =>
-              link.isRoute ? (
-                <Link
-                  key={link.label}
-                  to={link.href}
-                  className="text-white/80 hover:text-white transition-colors font-medium"
-                >
-                  {link.label}
+          <NavigationMenu className="hidden lg:flex">
+            <NavigationMenuList className="gap-2">
+              <NavigationMenuItem>
+                <Link to="/" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+                  Início
                 </Link>
-              ) : (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="text-white/80 hover:text-white transition-colors font-medium"
-                >
-                  {link.label}
-                </a>
-              )
-            )}
-          </nav>
+              </NavigationMenuItem>
+
+              {/* Funcionalidades Dropdown */}
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                  Funcionalidades
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[280px] gap-1 p-2 bg-secondary border border-white/10">
+                    {funcionalidadesLinks.map((link) => (
+                      <li key={link.href}>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            to={link.href}
+                            className={cn(
+                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                            )}
+                          >
+                            {link.label}
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+
+              <NavigationMenuItem>
+                <Link to="/plans" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+                  Planos
+                </Link>
+              </NavigationMenuItem>
+
+              {/* Integrações Dropdown */}
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                  Integrações
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
+                    {integracoesLinks.map((link) => (
+                      <li key={link.href}>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            to={link.href}
+                            className={cn(
+                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                            )}
+                          >
+                            {link.label}
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+
+              {/* Ajuda Dropdown */}
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                  Ajuda
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
+                    {ajudaLinks.map((link) => (
+                      <li key={link.href}>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            to={link.href}
+                            className={cn(
+                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                            )}
+                          >
+                            {link.label}
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
 
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-4">
@@ -148,9 +248,11 @@ export const Header = () => {
               </DropdownMenu>
             ) : (
               <>
-                <Button variant="hero" size="default">
-                  Começar agora
-                </Button>
+                <Link to="/register">
+                  <Button variant="hero" size="default">
+                    Começar agora
+                  </Button>
+                </Link>
                 <Link to="/login">
                   <Button variant="outlineLight" size="default">
                     Login
@@ -178,34 +280,75 @@ export const Header = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-secondary border-t border-white/10"
+            className="lg:hidden bg-secondary border-t border-white/10 max-h-[80vh] overflow-y-auto"
           >
-            <nav className="container mx-auto px-4 py-6 flex flex-col gap-4">
-              {navLinks.map((link) =>
-                link.isRoute ? (
+            <nav className="container mx-auto px-4 py-6 flex flex-col gap-2">
+              <Link
+                to="/"
+                className="text-white hover:text-accent transition-colors font-medium py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Início
+              </Link>
+              
+              {/* Mobile Funcionalidades */}
+              <div className="border-t border-white/10 pt-2">
+                <span className="text-accent font-semibold text-sm uppercase tracking-wide">Funcionalidades</span>
+                {funcionalidadesLinks.map((link) => (
                   <Link
-                    key={link.label}
+                    key={link.href}
                     to={link.href}
-                    className="text-white hover:text-accent transition-colors font-medium py-2"
+                    className="block text-white/80 hover:text-white transition-colors py-2 pl-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.label}
                   </Link>
-                ) : (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    className="text-white hover:text-accent transition-colors font-medium py-2"
+                ))}
+              </div>
+
+              <Link
+                to="/plans"
+                className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Planos
+              </Link>
+
+              {/* Mobile Integrações */}
+              <div className="border-t border-white/10 pt-2">
+                <span className="text-accent font-semibold text-sm uppercase tracking-wide">Integrações</span>
+                {integracoesLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="block text-white/80 hover:text-white transition-colors py-2 pl-2"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {link.label}
-                  </a>
-                )
-              )}
-              <div className="flex items-center justify-between py-2">
+                  </Link>
+                ))}
+              </div>
+
+              {/* Mobile Ajuda */}
+              <div className="border-t border-white/10 pt-2">
+                <span className="text-accent font-semibold text-sm uppercase tracking-wide">Ajuda</span>
+                {ajudaLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="block text-white/80 hover:text-white transition-colors py-2 pl-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between py-2 border-t border-white/10 pt-4">
                 <span className="text-white/80 font-medium">Tema</span>
                 <ThemeToggle />
               </div>
+              
               <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
                 {user ? (
                   <>
@@ -252,9 +395,11 @@ export const Header = () => {
                   </>
                 ) : (
                   <>
-                    <Button variant="hero" className="w-full">
-                      Começar agora
-                    </Button>
+                    <Link to="/register" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="hero" className="w-full">
+                        Começar agora
+                      </Button>
+                    </Link>
                     <Link to="/login" onClick={() => setIsMenuOpen(false)}>
                       <Button variant="outlineLight" className="w-full">
                         Login
