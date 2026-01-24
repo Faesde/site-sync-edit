@@ -1,8 +1,9 @@
 import { Header } from "@/components/layout/Header";
 import { Hero } from "@/components/sections/Hero";
-import { VideoSection } from "@/components/sections/VideoSection";
 import { Features } from "@/components/sections/Features";
-import { Highlights } from "@/components/sections/Highlights";
+import { BentoGrid } from "@/components/sections/BentoGrid";
+import { VideoSection } from "@/components/sections/VideoSection";
+import { Pricing } from "@/components/sections/Pricing";
 import { Solutions } from "@/components/sections/Solutions";
 import { Stats } from "@/components/sections/Stats";
 import { Integrations } from "@/components/sections/Integrations";
@@ -16,9 +17,10 @@ const Index = () => {
       <Header />
       <main>
         <Hero />
-        <VideoSection />
         <Features />
-        <Highlights />
+        <BentoGrid />
+        <VideoSection />
+        <Pricing />
         <Solutions />
         <Stats />
         <Integrations />
