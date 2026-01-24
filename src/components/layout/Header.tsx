@@ -97,100 +97,106 @@ export const Header = () => {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <NavigationMenu className="hidden lg:flex">
-            <NavigationMenuList className="gap-2">
-              <NavigationMenuItem>
-                <Link to="/" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
-                  Início
-                </Link>
-              </NavigationMenuItem>
+          {/* Desktop Navigation - Each dropdown has its own NavigationMenu */}
+          <nav className="hidden lg:flex items-center gap-1">
+            <Link to="/" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+              Início
+            </Link>
 
-              {/* Funcionalidades Dropdown */}
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
-                  Funcionalidades
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[280px] gap-1 p-2 bg-secondary border border-white/10">
-                    {funcionalidadesLinks.map((link) => (
-                      <li key={link.href}>
-                        <NavigationMenuLink asChild>
-                          <Link
-                            to={link.href}
-                            className={cn(
-                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
-                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
-                            )}
-                          >
-                            {link.label}
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
+            {/* Funcionalidades Dropdown */}
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                    Funcionalidades
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[280px] gap-1 p-2 bg-secondary border border-white/10">
+                      {funcionalidadesLinks.map((link) => (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              to={link.href}
+                              className={cn(
+                                "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                                "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                              )}
+                            >
+                              {link.label}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
 
-              <NavigationMenuItem>
-                <Link to="/plans" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
-                  Planos
-                </Link>
-              </NavigationMenuItem>
+            <Link to="/#planos" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+              Planos
+            </Link>
 
-              {/* Integrações Dropdown */}
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
-                  Integrações
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
-                    {integracoesLinks.map((link) => (
-                      <li key={link.href}>
-                        <NavigationMenuLink asChild>
-                          <Link
-                            to={link.href}
-                            className={cn(
-                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
-                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
-                            )}
-                          >
-                            {link.label}
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
+            {/* Integrações Dropdown */}
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                    Integrações
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
+                      {integracoesLinks.map((link) => (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              to={link.href}
+                              className={cn(
+                                "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                                "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                              )}
+                            >
+                              {link.label}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
 
-              {/* Ajuda Dropdown */}
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
-                  Ajuda
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
-                    {ajudaLinks.map((link) => (
-                      <li key={link.href}>
-                        <NavigationMenuLink asChild>
-                          <Link
-                            to={link.href}
-                            className={cn(
-                              "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
-                              "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
-                            )}
-                          >
-                            {link.label}
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    ))}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
+            {/* Ajuda Dropdown */}
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent text-white/80 hover:text-white hover:bg-white/10 data-[state=open]:bg-white/10">
+                    Ajuda
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[200px] gap-1 p-2 bg-secondary border border-white/10">
+                      {ajudaLinks.map((link) => (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              to={link.href}
+                              className={cn(
+                                "block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                                "text-white/80 hover:bg-white/10 hover:text-accent focus:bg-white/10"
+                              )}
+                            >
+                              {link.label}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          </nav>
 
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-4">
@@ -307,7 +313,7 @@ export const Header = () => {
               </div>
 
               <Link
-                to="/plans"
+                to="/#planos"
                 className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
                 onClick={() => setIsMenuOpen(false)}
               >
