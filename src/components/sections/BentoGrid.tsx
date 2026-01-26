@@ -9,6 +9,9 @@ import {
   LayoutDashboard,
   Package
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import chatbotLight from "@/assets/chatbot-light.png";
+import chatbotDark from "@/assets/chatbot-dark.png";
 
 const gridItems = [
   {
@@ -70,6 +73,8 @@ const gridItems = [
 ];
 
 export const BentoGrid = () => {
+  const { resolvedTheme } = useTheme();
+  
   return (
     <section className="py-24 bg-background relative overflow-hidden">
       <div className="container mx-auto px-4 lg:px-8">
@@ -103,19 +108,14 @@ export const BentoGrid = () => {
                 {item.description}
               </p>
 
-              {/* Visual decorations for larger cards */}
-              {item.className.includes("row-span-2") && (
-                <div className="mt-6 rounded-xl bg-muted/50 p-4 border border-border">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-3 h-3 rounded-full bg-red-400" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                    <div className="w-3 h-3 rounded-full bg-green-400" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-2 bg-muted rounded w-3/4" />
-                    <div className="h-2 bg-muted rounded w-1/2" />
-                    <div className="h-2 bg-muted rounded w-2/3" />
-                  </div>
+              {/* Chatbot image for the Chatbot + ChatGPT card */}
+              {item.title === "Chatbot + ChatGPT" && (
+                <div className="mt-4 rounded-xl overflow-hidden">
+                  <img 
+                    src={resolvedTheme === 'dark' ? chatbotDark : chatbotLight} 
+                    alt="Chatbot + ChatGPT Interface"
+                    className="w-full h-auto object-contain"
+                  />
                 </div>
               )}
 
