@@ -65,10 +65,10 @@ export const VideoSection = () => {
 
                 {/* Text */}
                 <p className="relative z-10 mt-6 text-white/90 font-medium text-lg">
-                  {videoUrl ? "Clique para assistir" : "Vídeo em breve"}
+                  Clique para assistir
                 </p>
                 <p className="relative z-10 mt-2 text-white/60 text-sm">
-                  {videoUrl ? "Duração: 3 minutos" : "Estamos preparando um vídeo explicativo"}
+                  Conheça a plataforma Wiki em poucos minutos
                 </p>
 
                 {/* Decorative Elements */}
