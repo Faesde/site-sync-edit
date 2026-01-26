@@ -5,7 +5,7 @@ import { useState } from "react";
 export const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   
-  const videoUrl = "https://www.youtube-nocookie.com/embed/EKO1_H_cYJE?autoplay=1&rel=0&modestbranding=1&controls=1&disablekb=1";
+  const videoUrl = "https://svxcmirrhbgfkpetfafk.supabase.co/storage/v1/object/public/video-wiki/0126%20(1).mp4";
 
   return (
     <section className="py-20 bg-muted/30">
@@ -31,17 +31,18 @@ export const VideoSection = () => {
           className="max-w-4xl mx-auto"
         >
           <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border border-border bg-card">
-            {videoUrl && isPlaying ? (
-              <iframe
+            {isPlaying ? (
+              <video
                 src={videoUrl}
                 className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+                controls
+                autoPlay
+                playsInline
               />
             ) : (
               <div 
                 className="w-full h-full bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 flex flex-col items-center justify-center cursor-pointer group"
-                onClick={() => videoUrl && setIsPlaying(true)}
+                onClick={() => setIsPlaying(true)}
               >
                 {/* Placeholder Visual */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-secondary opacity-90" />
