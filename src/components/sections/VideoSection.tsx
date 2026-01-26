@@ -5,7 +5,7 @@ import { useState } from "react";
 export const VideoSection = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   
-  const videoUrl = "https://www.youtube.com/embed/QCs0RrXgHj0?autoplay=1";
+  const videoUrl = "https://www.youtube-nocookie.com/embed/EKO1_H_cYJE?autoplay=1&rel=0&modestbranding=1&controls=1&disablekb=1";
 
   return (
     <section className="py-20 bg-muted/30">
