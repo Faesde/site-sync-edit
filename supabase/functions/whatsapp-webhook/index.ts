@@ -221,6 +221,23 @@ Deno.serve(async (req) => {
 
         // Insert the conversation record only if contact received a campaign and hasn't responded yet
         if (userId && shouldSaveMessage) {
+          // Resolve campaign name for UI (campaign_results table)
+          let campaignName: string | null = null
+          if (campaignId) {
+            const { data: campaignRow, error: campaignErr } = await supabase
+              .from('whatsapp_campaigns')
+              .select('name')
+              .eq('id', campaignId)
+              .eq('user_id', userId)
+              .maybeSingle()
+
+            if (campaignErr) {
+              console.error('Error fetching campaign name:', campaignErr)
+            } else {
+              campaignName = campaignRow?.name || null
+            }
+          }
+
           const { error: insertError } = await supabase
             .from('whatsapp_conversations')
             .insert({
@@ -241,6 +258,26 @@ Deno.serve(async (req) => {
             console.error('Error inserting conversation:', insertError)
           } else {
             console.log('First response saved successfully for contact:', contactPhone, 'campaign:', campaignId)
+          }
+
+          // Also insert into unified results table used by /results UI
+          const { error: resultsInsertError } = await supabase
+            .from('campaign_results')
+            .insert({
+              user_id: userId,
+              campaign_id: campaignId,
+              campaign_name: campaignName,
+              channel_type: 'whatsapp',
+              contact_phone: contactPhone,
+              contact_name: contactName,
+              message_content: messageContent,
+              status: 'received',
+            })
+
+          if (resultsInsertError) {
+            console.error('Error inserting campaign_results (whatsapp inbound):', resultsInsertError)
+          } else {
+            console.log('campaign_results saved (whatsapp inbound) for:', contactPhone, 'campaign:', campaignId)
           }
         } else if (!shouldSaveMessage && userId) {
           console.log('Skipping duplicate/non-campaign response from:', contactPhone)
