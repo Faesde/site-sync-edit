@@ -81,6 +81,12 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.C
   failed: { label: 'Falhou', color: 'bg-red-500/10 text-red-600', icon: XCircle },
   pending: { label: 'Pendente', color: 'bg-yellow-500/10 text-yellow-600', icon: Clock },
   completed: { label: 'Completado', color: 'bg-green-500/10 text-green-600', icon: CheckCircle },
+  confirmed: { label: 'Confirmado', color: 'bg-green-500/10 text-green-600', icon: CheckCircle },
+  answered: { label: 'Atendido', color: 'bg-green-500/10 text-green-600', icon: Phone },
+  'in-progress': { label: 'Em andamento', color: 'bg-blue-500/10 text-blue-600', icon: Clock },
+  ringing: { label: 'Chamando', color: 'bg-yellow-500/10 text-yellow-600', icon: Phone },
+  busy: { label: 'Ocupado', color: 'bg-orange-500/10 text-orange-600', icon: Phone },
+  'no-answer': { label: 'Sem resposta', color: 'bg-red-500/10 text-red-600', icon: XCircle },
 };
 
 const Results = () => {
