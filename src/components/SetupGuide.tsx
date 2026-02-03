@@ -187,22 +187,34 @@ const CloudAPIGuide = ({ webhookUrl, onCopy, copiedField }: GuideProps) => {
       content: (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            No Twilio Console, vá em <strong>Account &gt; API keys & tokens</strong>:
+            No Twilio Console, encontre as credenciais em dois lugares:
           </p>
-          <ul className="space-y-2 text-sm">
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5 shrink-0">1</Badge>
-              <span><strong>Account SID</strong> → Use como "Business Account ID"</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5 shrink-0">2</Badge>
-              <span><strong>Auth Token</strong> → Use como "Access Token"</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Badge variant="outline" className="mt-0.5 shrink-0">3</Badge>
-              <span><strong>Phone Number SID</strong> → Use como "Phone Number ID" (encontre em WhatsApp Senders)</span>
-            </li>
-          </ul>
+          
+          <div className="space-y-3">
+            <div className="p-3 bg-background rounded-lg border">
+              <p className="text-xs font-semibold text-primary mb-2">📱 Em "WhatsApp Senders":</p>
+              <ul className="space-y-1 text-sm">
+                <li className="flex items-start gap-2">
+                  <Badge variant="outline" className="mt-0.5 shrink-0 text-xs">1</Badge>
+                  <span><strong>WhatsApp Business Account ID</strong> → Use como "Business Account ID"</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Badge variant="outline" className="mt-0.5 shrink-0 text-xs">2</Badge>
+                  <span><strong>Número WhatsApp</strong> (ex: +554723980057) → Use como "Phone Number ID"</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="p-3 bg-background rounded-lg border">
+              <p className="text-xs font-semibold text-primary mb-2">🔑 Em "Account &gt; API keys & tokens":</p>
+              <ul className="space-y-1 text-sm">
+                <li className="flex items-start gap-2">
+                  <Badge variant="outline" className="mt-0.5 shrink-0 text-xs">3</Badge>
+                  <span><strong>Auth Token</strong> → Use como "Access Token"</span>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       )
     },
