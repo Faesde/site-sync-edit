@@ -34,6 +34,9 @@ import IntegrationDetail from "./pages/integrations/IntegrationDetail";
 // Admin Pages
 import Admin from "./pages/Admin";
 
+// Auth Pages
+import ResetPassword from "./pages/ResetPassword";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -47,6 +50,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/plans" element={<Plans />} />
             <Route path="/settings" element={<Settings />} />
