@@ -200,6 +200,11 @@ serve(async (req) => {
                 contact_name: contact.name || null,
                 message_content: personalizedMessage,
                 status: 'failed',
+                raw_payload: {
+                  provider: 'evolution',
+                  instance: instance.instance_name,
+                  error: evolutionResult,
+                },
                 created_at: new Date().toISOString(),
               });
 
@@ -226,7 +231,11 @@ serve(async (req) => {
                 contact_name: contact.name || null,
                 message_content: personalizedMessage,
                 status: 'sent',
-                external_id: messageId || null,
+                raw_payload: {
+                  provider: 'evolution',
+                  instance: instance.instance_name,
+                  message_id: messageId || null,
+                },
                 created_at: new Date().toISOString(),
               });
             
