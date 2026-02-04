@@ -31,6 +31,9 @@ import VoiceMarketing from "./pages/features/VoiceMarketing";
 import IntegrationsPage from "./pages/integrations/IntegrationsPage";
 import IntegrationDetail from "./pages/integrations/IntegrationDetail";
 
+// Admin Pages
+import Admin from "./pages/Admin";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -68,6 +71,9 @@ const App = () => (
             {/* Integration Pages */}
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/integrations/:slug" element={<IntegrationDetail />} />
+            
+            {/* Admin Pages */}
+            <Route path="/admin" element={<Admin />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
