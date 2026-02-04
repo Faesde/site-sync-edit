@@ -45,9 +45,13 @@ import {
   XCircle,
   Calendar,
   RefreshCw,
+  Key,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -90,6 +94,14 @@ const Admin = () => {
     type: 'activate' | 'deactivate' | 'promote' | 'demote';
     user: UserWithDetails;
   } | null>(null);
+
+  // Password change dialog state
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordUser, setPasswordUser] = useState<UserWithDetails | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const isAdmin = role === 'admin';
 
@@ -209,6 +221,47 @@ const Admin = () => {
       toast.error('Erro ao atualizar usuário');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordUser) return;
+
+    if (newPassword.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast.error('As senhas não coincidem');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user-password', {
+        body: {
+          user_id: passwordUser.user_id,
+          new_password: newPassword,
+        },
+      });
+
+      if (error) throw error;
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro ao alterar senha');
+      }
+
+      toast.success('Senha alterada com sucesso!');
+      setIsPasswordDialogOpen(false);
+      setPasswordUser(null);
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (error: any) {
+      console.error('Erro ao alterar senha:', error);
+      toast.error(error.message || 'Erro ao alterar senha');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -518,6 +571,19 @@ const Admin = () => {
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setPasswordUser(u);
+                              setNewPassword('');
+                              setConfirmNewPassword('');
+                              setIsPasswordDialogOpen(true);
+                            }}
+                            title="Alterar senha"
+                          >
+                            <Key className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -633,6 +699,68 @@ const Admin = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password Change Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Alterar Senha
+            </DialogTitle>
+            <DialogDescription>
+              Alterar senha de {passwordUser?.full_name || passwordUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="newPassword">Nova Senha</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirmNewPassword">Confirmar Nova Senha</Label>
+              <Input
+                id="confirmNewPassword"
+                type={showNewPassword ? "text" : "password"}
+                placeholder="Repita a senha"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+              />
+            </div>
+            {newPassword && confirmNewPassword && newPassword !== confirmNewPassword && (
+              <p className="text-sm text-destructive">As senhas não coincidem</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleChangePassword} 
+              disabled={isChangingPassword || !newPassword || newPassword !== confirmNewPassword || newPassword.length < 6}
+            >
+              {isChangingPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Alterar Senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
