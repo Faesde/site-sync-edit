@@ -33,6 +33,7 @@ import {
   ChevronDown,
   Play,
   Pause,
+  Timer,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,6 +51,7 @@ import { supabaseWiki } from "@/lib/supabaseWiki";
 import { CampaignNameModal } from "@/components/CampaignNameModal";
 import { IVRConfigEditor, type IVRMenuItem } from "@/components/IVRConfigEditor";
 import { toast } from "@/hooks/use-toast";
+import { CampaignProgressModal } from "@/components/CampaignProgressModal";
 
 interface Contact {
   id: string;
@@ -173,6 +175,23 @@ const Contacts = () => {
 
   // Campaign name modal
   const [showCampaignModal, setShowCampaignModal] = useState(false);
+  
+  // Send interval configuration (in seconds)
+  const [sendInterval, setSendInterval] = useState<number>(1);
+  const [sendIntervalUnit, setSendIntervalUnit] = useState<'seconds' | 'minutes'>('seconds');
+  
+  // Campaign progress tracking
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [campaignProgress, setCampaignProgress] = useState({
+    totalContacts: 0,
+    sentCount: 0,
+    failedCount: 0,
+    currentContact: '',
+    isComplete: false,
+    campaignName: '',
+  });
+  const [isRunningInBackground, setIsRunningInBackground] = useState(false);
+  
   const extractTemplateVariables = (body: string): string[] => {
     const matches = body.match(/\{\{\d+\}\}/g) || [];
     return [...new Set(matches)].sort((a, b) => {
@@ -781,7 +800,7 @@ const Contacts = () => {
             console.error('Erro ao enviar WhatsApp via Edge Function:', error);
           }
         } else if (selectedActions.includes('whatsapp') && whatsappProvider === 'evolution') {
-          // Send via Evolution API Edge Function
+          // Send via Evolution API with real-time progress
           try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -821,40 +840,99 @@ const Contacts = () => {
               return;
             }
 
-            const evolutionContacts = selectedContacts.map(c => ({
-              name: c.name,
-              phone: c.phone,
-              email: c.email,
+            // Calculate interval in milliseconds
+            const intervalMs = sendIntervalUnit === 'minutes' 
+              ? sendInterval * 60 * 1000 
+              : sendInterval * 1000;
+
+            // Initialize progress modal
+            setCampaignProgress({
+              totalContacts: selectedContacts.length,
+              sentCount: 0,
+              failedCount: 0,
+              currentContact: '',
+              isComplete: false,
+              campaignName: campaignName,
+            });
+            setShowProgressModal(true);
+            setIsRunningInBackground(false);
+
+            // Send messages one by one with progress tracking
+            let sentCount = 0;
+            let failedCount = 0;
+
+            for (let i = 0; i < selectedContacts.length; i++) {
+              const contact = selectedContacts[i];
+              
+              // Update current contact
+              setCampaignProgress(prev => ({
+                ...prev,
+                currentContact: contact.name || contact.phone,
+              }));
+
+              try {
+                const response = await supabase.functions.invoke('evolution-send-message', {
+                  headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                  },
+                  body: {
+                    instance_id: selectedEvolutionInstanceId,
+                    campaign_id: unifiedCampaignId,
+                    contacts: [{ name: contact.name, phone: contact.phone, email: contact.email }],
+                    message_body: messageBody,
+                    template_id: selectedEvolutionTemplateId,
+                  },
+                });
+
+                if (response.error || !response.data?.success) {
+                  failedCount++;
+                } else {
+                  sentCount += response.data.sent || 1;
+                  if (response.data.failed) {
+                    failedCount += response.data.failed;
+                  }
+                }
+              } catch (error) {
+                console.error('Erro ao enviar para:', contact.phone, error);
+                failedCount++;
+              }
+
+              // Update progress
+              setCampaignProgress(prev => ({
+                ...prev,
+                sentCount,
+                failedCount,
+              }));
+
+              // Wait for interval before next message (except for last one)
+              if (i < selectedContacts.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+              }
+            }
+
+            // Mark as complete
+            setCampaignProgress(prev => ({
+              ...prev,
+              isComplete: true,
+              currentContact: '',
             }));
 
-            const response = await supabase.functions.invoke('evolution-send-message', {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: {
-                instance_id: selectedEvolutionInstanceId,
-                campaign_id: unifiedCampaignId,
-                contacts: evolutionContacts,
-                message_body: messageBody,
-                template_id: selectedEvolutionTemplateId,
-              },
+            // Update campaign stats
+            if (user) {
+              await supabaseWiki
+                .from('whatsapp_campaigns')
+                .update({
+                  sent_count: sentCount,
+                  failed_count: failedCount,
+                })
+                .eq('id', unifiedCampaignId);
+            }
+
+            toast({
+              title: "Campanha finalizada!",
+              description: `${sentCount} enviadas, ${failedCount} falhas.`,
             });
 
-            if (response.error) {
-              console.error('Erro ao enviar WhatsApp Evolution:', response.error);
-              toast({
-                title: "Erro no envio",
-                description: response.error.message,
-                variant: "destructive"
-              });
-            } else {
-              console.log('Campanha Evolution enviada!', response.data);
-              
-              toast({
-                title: "Campanha enviada!",
-                description: `${response.data.sent} mensagens enviadas com sucesso.${response.data.failed > 0 ? ` ${response.data.failed} falharam.` : ''}`,
-              });
-            }
           } catch (error) {
             console.error('Erro ao enviar WhatsApp via Evolution:', error);
             toast({
@@ -862,7 +940,9 @@ const Contacts = () => {
               description: "Erro ao enviar mensagens. Tente novamente.",
               variant: "destructive"
             });
+            setCampaignProgress(prev => ({ ...prev, isComplete: true }));
           }
+          return; // Don't show old processing modal
         }
 
         // Se há outras ações além de WhatsApp, envia para o webhook padrão
@@ -887,7 +967,10 @@ const Contacts = () => {
       }
     }
 
-    setIsProcessing(true);
+    // Only show old processing modal if not Evolution
+    if (whatsappProvider !== 'evolution') {
+      setIsProcessing(true);
+    }
   };
 
 
@@ -1368,7 +1451,58 @@ const Contacts = () => {
                   )}
                 </AnimatePresence>
 
-                {/* No provider configured */}
+                {/* Send Interval Configuration */}
+                <AnimatePresence>
+                  {selectedActions.includes('whatsapp') && whatsappProvider === 'evolution' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4"
+                    >
+                      <div className="bg-accent/10 border border-accent/30 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Timer className="w-5 h-5 text-accent-foreground" />
+                          <h3 className="text-sm font-semibold text-accent-foreground">
+                            Intervalo entre Envios
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Intervalo</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={sendIntervalUnit === 'minutes' ? 60 : 300}
+                              value={sendInterval}
+                              onChange={(e) => setSendInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="bg-card/50 border-accent/30"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Unidade</Label>
+                            <Select
+                              value={sendIntervalUnit}
+                              onValueChange={(v: 'seconds' | 'minutes') => setSendIntervalUnit(v)}
+                            >
+                              <SelectTrigger className="bg-card/50 border-accent/30">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="seconds">Segundos</SelectItem>
+                                <SelectItem value="minutes">Minutos</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          💡 Cada mensagem será enviada a cada {sendInterval} {sendIntervalUnit === 'minutes' ? 'minuto(s)' : 'segundo(s)'}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <AnimatePresence>
                   {selectedActions.includes('whatsapp') && !whatsappProvider && (
                     <motion.div
@@ -1779,6 +1913,39 @@ const Contacts = () => {
           onClose={() => setShowCampaignModal(false)}
           onConfirm={handleExecuteActions}
           contactsCount={contacts.filter(c => c.selected).length}
+        />
+
+        {/* Campaign Progress Modal */}
+        <CampaignProgressModal
+          isOpen={showProgressModal}
+          totalContacts={campaignProgress.totalContacts}
+          sentCount={campaignProgress.sentCount}
+          failedCount={campaignProgress.failedCount}
+          currentContact={campaignProgress.currentContact}
+          isComplete={campaignProgress.isComplete}
+          campaignName={campaignProgress.campaignName}
+          onContinueInBackground={() => {
+            setIsRunningInBackground(true);
+            setShowProgressModal(false);
+            toast({
+              title: "Enviando em background",
+              description: "O envio continua mesmo que você navegue para outra página.",
+            });
+          }}
+          onNewCampaign={() => {
+            setShowProgressModal(false);
+            setContacts([]);
+            setSelectedActions([]);
+            setUploadedFileName(null);
+            setCampaignProgress({
+              totalContacts: 0,
+              sentCount: 0,
+              failedCount: 0,
+              currentContact: '',
+              isComplete: false,
+              campaignName: '',
+            });
+          }}
         />
       </main>
     </div>
