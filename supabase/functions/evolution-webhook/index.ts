@@ -51,8 +51,24 @@ serve(async (req) => {
       }
 
       const remoteJid = key?.remoteJid || '';
+
+      // Ignore group messages (cannot be reliably mapped to a campaign/contact)
+      if (remoteJid.endsWith('@g.us')) {
+        console.log('Ignoring group message:', remoteJid);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Group message ignored' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Extract phone number (remove @s.whatsapp.net suffix)
       const contactPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
+      const contactPhoneNoCountry = contactPhone.startsWith('55') ? contactPhone.slice(2) : contactPhone;
+      const contactPhoneWithCountry = contactPhoneNoCountry ? `55${contactPhoneNoCountry}` : contactPhone;
+      const contactPhoneCandidates = Array.from(
+        new Set([contactPhone, contactPhoneNoCountry, contactPhoneWithCountry].filter(Boolean))
+      );
+
       const messageContent = message?.conversation || 
                             message?.extendedTextMessage?.text || 
                             message?.imageMessage?.caption ||
@@ -90,11 +106,37 @@ serve(async (req) => {
         .from('campaign_results')
         .select('id, campaign_id, campaign_name')
         .eq('user_id', userId)
-        .eq('contact_phone', contactPhone)
+        .in('contact_phone', contactPhoneCandidates)
         .eq('channel_type', 'whatsapp')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      // If we can't link this inbound message to a campaign, don't write into campaign_results
+      // because campaign_id is NOT NULL (and we only want campaign-linked results there).
+      if (!recentCampaign?.campaign_id) {
+        console.log('No recent campaign found for contact; skipping campaign_results insert.');
+
+        // Still save to conversations for chat history
+        await supabase
+          .from('whatsapp_conversations')
+          .insert({
+            user_id: userId,
+            contact_phone: contactPhone,
+            contact_name: pushName,
+            message_id: messageId,
+            direction: 'inbound',
+            message_type: messageType,
+            message_content: messageContent,
+            status: 'received',
+            campaign_id: null,
+          });
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Saved to conversations only' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       // Insert the response into campaign_results
       // NOTE: Use channel_type (not channel) and message_content (not response_content)
@@ -110,11 +152,9 @@ serve(async (req) => {
       };
 
       // Link to campaign if found
-      if (recentCampaign) {
-        resultData.campaign_id = recentCampaign.campaign_id;
-        resultData.campaign_name = recentCampaign.campaign_name;
-        console.log(`Linked to campaign: ${recentCampaign.campaign_name}`);
-      }
+      resultData.campaign_id = recentCampaign.campaign_id;
+      resultData.campaign_name = recentCampaign.campaign_name;
+      console.log(`Linked to campaign: ${recentCampaign.campaign_name}`);
 
       const { error: insertError } = await supabase
         .from('campaign_results')
