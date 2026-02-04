@@ -91,19 +91,20 @@ serve(async (req) => {
         .select('id, campaign_id, campaign_name')
         .eq('user_id', userId)
         .eq('contact_phone', contactPhone)
-        .eq('channel', 'whatsapp')
+        .eq('channel_type', 'whatsapp')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       // Insert the response into campaign_results
+      // NOTE: Use channel_type (not channel) and message_content (not response_content)
       const resultData: Record<string, unknown> = {
         user_id: userId,
         contact_phone: contactPhone,
         contact_name: pushName,
-        channel: 'whatsapp',
+        channel_type: 'whatsapp',
         status: 'received',
-        response_content: messageContent,
+        message_content: messageContent,
         external_id: messageId,
         created_at: new Date().toISOString(),
       };
