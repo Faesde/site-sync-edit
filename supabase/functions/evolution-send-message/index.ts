@@ -118,8 +118,9 @@ serve(async (req) => {
       );
     }
 
-    // Get instance from database
+    // Get instance from database (explicit wiki schema)
     const { data: instance, error: fetchError } = await supabase
+      .schema('wiki')
       .from('evolution_instances')
       .select('*')
       .eq('id', instance_id)
@@ -187,7 +188,8 @@ serve(async (req) => {
           
           // Insert failed record into campaign_results
           if (campaign_id) {
-            await supabase
+            const { error: insertFailedError } = await supabase
+              .schema('wiki')
               .from('campaign_results')
               .insert({
                 user_id: user.id,
@@ -200,6 +202,10 @@ serve(async (req) => {
                 status: 'failed',
                 created_at: new Date().toISOString(),
               });
+
+            if (insertFailedError) {
+              console.error('Error inserting FAILED campaign_result:', insertFailedError);
+            }
           }
         } else {
           const messageId = evolutionResult.key?.id;
@@ -209,6 +215,7 @@ serve(async (req) => {
           // Insert sent record into campaign_results for tracking responses
           if (campaign_id) {
             const { error: insertError } = await supabase
+              .schema('wiki')
               .from('campaign_results')
               .insert({
                 user_id: user.id,
@@ -247,6 +254,7 @@ serve(async (req) => {
     // Update campaign stats if campaign_id provided
     if (campaign_id) {
       await supabase
+        .schema('wiki')
         .from('whatsapp_campaigns')
         .update({
           sent_count: results.sent,
