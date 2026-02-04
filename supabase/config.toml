@@ -41,3 +41,12 @@ verify_jwt = false
 
 [functions.evolution-delete-instance]
 verify_jwt = false
+
+[functions.evolution-send-message]
+verify_jwt = false
+
+[functions.evolution-webhook]
+verify_jwt = false
+
+[functions.admin-update-user-password]
+verify_jwt = false
