@@ -66,7 +66,10 @@ serve(async (req) => {
 
     console.log("Creating instance in Evolution API:", uniqueInstanceName);
 
-    // Create instance in Evolution API
+    // Build webhook URL
+    const webhookUrl = `${supabaseUrl}/functions/v1/evolution-webhook`;
+
+    // Create instance in Evolution API with webhook configuration
     const evolutionResponse = await fetch(`${evolutionUrl}/instance/create`, {
       method: 'POST',
       headers: {
@@ -76,7 +79,18 @@ serve(async (req) => {
       body: JSON.stringify({
         instanceName: uniqueInstanceName,
         qrcode: true,
-        integration: "WHATSAPP-BAILEYS"
+        integration: "WHATSAPP-BAILEYS",
+        // Auto-configure webhook
+        webhook: {
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "CONNECTION_UPDATE"
+          ]
+        }
       }),
     });
 
@@ -90,6 +104,31 @@ serve(async (req) => {
         JSON.stringify({ success: false, error: errorMsg }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Also set webhook via dedicated endpoint (some Evolution versions need this)
+    try {
+      await fetch(`${evolutionUrl}/webhook/set/${uniqueInstanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey,
+        },
+        body: JSON.stringify({
+          enabled: true,
+          url: webhookUrl,
+          webhookByEvents: false,
+          webhookBase64: false,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "CONNECTION_UPDATE"
+          ]
+        }),
+      });
+      console.log("Webhook configured for instance:", uniqueInstanceName);
+    } catch (webhookError) {
+      console.log("Webhook set via create, fallback endpoint not needed:", webhookError);
     }
 
     // Save instance to database
