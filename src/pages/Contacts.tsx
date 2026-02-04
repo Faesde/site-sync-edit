@@ -878,6 +878,7 @@ const Contacts = () => {
                   body: {
                     instance_id: selectedEvolutionInstanceId,
                     campaign_id: unifiedCampaignId,
+                    campaign_name: campaignName,
                     contacts: [{ name: contact.name, phone: contact.phone, email: contact.email }],
                     message_body: messageBody,
                     template_id: selectedEvolutionTemplateId,
