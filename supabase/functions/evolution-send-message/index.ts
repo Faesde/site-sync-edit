@@ -87,6 +87,7 @@ serve(async (req) => {
     const { 
       instance_id,
       campaign_id,
+      campaign_name,
       contacts,
       message_body,
       template_id
@@ -183,9 +184,51 @@ serve(async (req) => {
           console.error('Evolution API error for', formattedPhone, ':', evolutionResult);
           results.failed++;
           results.errors.push(`${contact.name}: ${evolutionResult.message || 'Erro desconhecido'}`);
+          
+          // Insert failed record into campaign_results
+          if (campaign_id) {
+            await supabase
+              .from('campaign_results')
+              .insert({
+                user_id: user.id,
+                campaign_id: campaign_id,
+                campaign_name: campaign_name || null,
+                channel_type: 'whatsapp',
+                contact_phone: formattedPhone,
+                contact_name: contact.name || null,
+                message_content: personalizedMessage,
+                status: 'failed',
+                created_at: new Date().toISOString(),
+              });
+          }
         } else {
-          console.log('Message sent to', formattedPhone, 'ID:', evolutionResult.key?.id);
+          const messageId = evolutionResult.key?.id;
+          console.log('Message sent to', formattedPhone, 'ID:', messageId);
           results.sent++;
+          
+          // Insert sent record into campaign_results for tracking responses
+          if (campaign_id) {
+            const { error: insertError } = await supabase
+              .from('campaign_results')
+              .insert({
+                user_id: user.id,
+                campaign_id: campaign_id,
+                campaign_name: campaign_name || null,
+                channel_type: 'whatsapp',
+                contact_phone: formattedPhone,
+                contact_name: contact.name || null,
+                message_content: personalizedMessage,
+                status: 'sent',
+                external_id: messageId || null,
+                created_at: new Date().toISOString(),
+              });
+            
+            if (insertError) {
+              console.error('Error inserting campaign_result:', insertError);
+            } else {
+              console.log('Campaign result saved for:', formattedPhone);
+            }
+          }
         }
 
         // Small delay between messages to avoid rate limiting
