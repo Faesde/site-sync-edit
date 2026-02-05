@@ -6,8 +6,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Generate phone number variations for matching (handles Brazilian 9th digit)
+function getPhoneVariations(phone: string): string[] {
+  const cleaned = phone.replace(/\D/g, '');
+  const variations = new Set<string>();
+  
+  variations.add(cleaned);
+  
+  if (!cleaned.startsWith('55')) {
+    variations.add('55' + cleaned);
+  }
+  if (cleaned.startsWith('55')) {
+    variations.add(cleaned.slice(2));
+  }
+  
+  const withCountry = cleaned.startsWith('55') ? cleaned : '55' + cleaned;
+  
+  if (withCountry.length === 13) {
+    const ddd = withCountry.slice(2, 4);
+    const rest = withCountry.slice(5);
+    variations.add('55' + ddd + rest);
+    variations.add(ddd + rest);
+  } else if (withCountry.length === 12) {
+    const ddd = withCountry.slice(2, 4);
+    const rest = withCountry.slice(4);
+    variations.add('55' + ddd + '9' + rest);
+    variations.add(ddd + '9' + rest);
+  }
+  
+  return Array.from(variations);
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -41,7 +71,6 @@ serve(async (req) => {
       const message = data.message;
       const key = data.key;
       
-      // Only process incoming messages (not sent by us)
       if (key?.fromMe === true) {
         console.log('Ignoring outgoing message');
         return new Response(
@@ -52,7 +81,6 @@ serve(async (req) => {
 
       const remoteJid = key?.remoteJid || '';
 
-      // Ignore group messages (cannot be reliably mapped to a campaign/contact)
       if (remoteJid.endsWith('@g.us')) {
         console.log('Ignoring group message:', remoteJid);
         return new Response(
@@ -61,13 +89,8 @@ serve(async (req) => {
         );
       }
 
-      // Extract phone number (remove @s.whatsapp.net suffix)
       const contactPhone = remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');
-      const contactPhoneNoCountry = contactPhone.startsWith('55') ? contactPhone.slice(2) : contactPhone;
-      const contactPhoneWithCountry = contactPhoneNoCountry ? `55${contactPhoneNoCountry}` : contactPhone;
-      const contactPhoneCandidates = Array.from(
-        new Set([contactPhone, contactPhoneNoCountry, contactPhoneWithCountry].filter(Boolean))
-      );
+      const contactPhoneCandidates = getPhoneVariations(contactPhone);
 
       const messageContent = message?.conversation || 
                             message?.extendedTextMessage?.text || 
@@ -82,9 +105,8 @@ serve(async (req) => {
       const pushName = data.pushName || 'Desconhecido';
       const messageId = key?.id;
 
-      console.log(`Incoming message from ${contactPhone}: ${messageContent}`);
+      console.log(`Incoming message from ${contactPhone} (variations: ${contactPhoneCandidates.join(', ')}): ${messageContent}`);
 
-      // Find the Evolution instance to get user_id
       const { data: instanceData } = await supabase
         .from('evolution_instances')
         .select('user_id')
@@ -101,23 +123,21 @@ serve(async (req) => {
 
       const userId = instanceData.user_id;
 
-      // Try to find a recent campaign sent to this contact
+      // Find the most recent SENT campaign message to this contact
       const { data: recentCampaign } = await supabase
         .from('campaign_results')
         .select('id, campaign_id, campaign_name')
         .eq('user_id', userId)
         .in('contact_phone', contactPhoneCandidates)
         .eq('channel_type', 'whatsapp')
+        .eq('status', 'sent') // Only match sent messages, not received ones
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      // If we can't link this inbound message to a campaign, don't write into campaign_results
-      // because campaign_id is NOT NULL (and we only want campaign-linked results there).
       if (!recentCampaign?.campaign_id) {
         console.log('No recent campaign found for contact; skipping campaign_results insert.');
 
-        // Still save to conversations for chat history
         await supabase
           .from('whatsapp_conversations')
           .insert({
@@ -138,35 +158,70 @@ serve(async (req) => {
         );
       }
 
-      // Insert the response into campaign_results
-      // NOTE: Use channel_type (not channel) and message_content (not response_content)
-      const resultData: Record<string, unknown> = {
-        user_id: userId,
-        contact_phone: contactPhone,
-        contact_name: pushName,
-        channel_type: 'whatsapp',
-        status: 'received',
-        message_content: messageContent,
-        external_id: messageId,
-        created_at: new Date().toISOString(),
-      };
+      console.log(`Linked to campaign: ${recentCampaign.campaign_name} (ID: ${recentCampaign.campaign_id})`);
 
-      // Link to campaign if found
-      resultData.campaign_id = recentCampaign.campaign_id;
-      resultData.campaign_name = recentCampaign.campaign_name;
-      console.log(`Linked to campaign: ${recentCampaign.campaign_name}`);
+      // Check if we already have a 'received' response for this contact/campaign combination
+      const { data: existingResponse } = await supabase
+        .from('campaign_results')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('campaign_id', recentCampaign.campaign_id)
+        .in('contact_phone', contactPhoneCandidates)
+        .eq('status', 'received')
+        .limit(1)
+        .maybeSingle();
 
+      if (existingResponse) {
+        console.log('Response already exists for this contact/campaign, skipping duplicate insert.');
+        
+        // Still save to conversations for chat history
+        await supabase
+          .from('whatsapp_conversations')
+          .insert({
+            user_id: userId,
+            contact_phone: contactPhone,
+            contact_name: pushName,
+            message_id: messageId,
+            direction: 'inbound',
+            message_type: messageType,
+            message_content: messageContent,
+            status: 'received',
+            campaign_id: recentCampaign.campaign_id,
+          });
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Duplicate response skipped, saved to conversations' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Insert the FIRST response into campaign_results (using raw_payload instead of external_id)
       const { error: insertError } = await supabase
         .from('campaign_results')
-        .insert(resultData);
+        .insert({
+          user_id: userId,
+          campaign_id: recentCampaign.campaign_id,
+          campaign_name: recentCampaign.campaign_name,
+          channel_type: 'whatsapp',
+          contact_phone: contactPhone,
+          contact_name: pushName,
+          message_content: messageContent,
+          status: 'received',
+          raw_payload: {
+            provider: 'evolution',
+            message_id: messageId,
+            message_type: messageType,
+            instance: instance,
+          },
+          created_at: new Date().toISOString(),
+        });
 
       if (insertError) {
         console.error('Error inserting response:', insertError);
       } else {
-        console.log('Response saved successfully');
+        console.log('First response saved successfully');
       }
 
-      // Also save to conversations for chat history
       await supabase
         .from('whatsapp_conversations')
         .insert({
@@ -178,21 +233,20 @@ serve(async (req) => {
           message_type: messageType,
           message_content: messageContent,
           status: 'received',
-          campaign_id: recentCampaign?.campaign_id || null,
+          campaign_id: recentCampaign.campaign_id,
         });
     }
 
-    // Handle message status updates (delivered, read)
+    // Handle message status updates (using raw_payload->>message_id instead of external_id)
     if (event === 'messages.update') {
       const updates = Array.isArray(data) ? data : [data];
       
       for (const update of updates) {
-        const messageId = update.key?.id;
-        const status = update.update?.status;
+        const messageId = update.key?.id || update.keyId;
+        const status = update.status || update.update?.status;
         
         if (!messageId || !status) continue;
 
-        // Map Evolution status codes to readable status
         let mappedStatus = 'sent';
         if (status === 2 || status === 'DELIVERY_ACK') mappedStatus = 'delivered';
         if (status === 3 || status === 'READ') mappedStatus = 'read';
@@ -200,14 +254,14 @@ serve(async (req) => {
 
         console.log(`Status update for ${messageId}: ${mappedStatus}`);
 
-        // Update campaign_results with new status
+        // Update using raw_payload->>message_id
         const { error: updateError } = await supabase
           .from('campaign_results')
           .update({ 
             status: mappedStatus,
             updated_at: new Date().toISOString()
           })
-          .eq('external_id', messageId);
+          .filter('raw_payload->>message_id', 'eq', messageId);
 
         if (updateError) {
           console.error('Error updating status:', updateError);

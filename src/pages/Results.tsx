@@ -17,6 +17,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   MessageSquare, 
   Phone, 
@@ -33,7 +43,8 @@ import {
   TrendingUp,
   Filter,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -99,6 +110,9 @@ const Results = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -214,6 +228,63 @@ const Results = () => {
       }
       return newSet;
     });
+  };
+
+  const handleDeleteCampaign = async () => {
+    if (!campaignToDelete || !user) return;
+
+    setDeleting(true);
+    try {
+      // Delete campaign results first
+      const { error: resultsError } = await supabaseWiki
+        .from('campaign_results')
+        .delete()
+        .eq('campaign_id', campaignToDelete.id)
+        .eq('user_id', user.id);
+
+      if (resultsError) {
+        console.error('Error deleting campaign results:', resultsError);
+      }
+
+      // Delete the campaign
+      const { error: campaignError } = await supabaseWiki
+        .from('whatsapp_campaigns')
+        .delete()
+        .eq('id', campaignToDelete.id)
+        .eq('user_id', user.id);
+
+      if (campaignError) throw campaignError;
+
+      // Update local state
+      setCampaigns(prev => prev.filter(c => c.id !== campaignToDelete.id));
+      setCampaignResults(prev => prev.filter(r => r.campaign_id !== campaignToDelete.id));
+      
+      if (selectedCampaign === campaignToDelete.id) {
+        setSelectedCampaign('all');
+      }
+
+      toast({
+        title: "Campanha excluída",
+        description: `A campanha "${campaignToDelete.name}" foi excluída com sucesso.`,
+      });
+    } catch (error: any) {
+      console.error('Error deleting campaign:', error);
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
+    }
+  };
+
+  const openDeleteDialog = (campaign: Campaign, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCampaignToDelete(campaign);
+    setDeleteDialogOpen(true);
   };
 
   if (authLoading) {
@@ -520,67 +591,113 @@ const Results = () => {
         {campaigns.length > 0 && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="text-lg">Resumo das Campanhas</CardTitle>
+              <CardTitle className="text-lg">Resumo das Campanhas ({campaigns.length})</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead>Nome</TableHead>
-                    <TableHead className="text-center">Contatos</TableHead>
-                    <TableHead className="text-center">Enviados</TableHead>
-                    <TableHead className="text-center">Falhas</TableHead>
-                    <TableHead className="text-right">Data</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaigns.slice(0, 5).map((campaign) => (
-                    <TableRow 
-                      key={campaign.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => {
-                        setSelectedCampaign(campaign.id);
-                        setShowFilters(true);
-                      }}
-                    >
-                      <TableCell>
-                        <p className="font-medium">{campaign.name}</p>
-                        {campaign.template_name && (
-                          <p className="text-xs text-muted-foreground">{campaign.template_name}</p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="gap-1">
-                          <Users className="h-3 w-3" />
-                          {campaign.contacts_count}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600">
-                          <CheckCircle className="h-3 w-3" />
-                          {campaign.sent_count}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {campaign.failed_count > 0 ? (
-                          <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600">
-                            <XCircle className="h-3 w-3" />
-                            {campaign.failed_count}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {format(new Date(campaign.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </TableCell>
+              <ScrollArea className="max-h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead>Nome</TableHead>
+                      <TableHead className="text-center">Contatos</TableHead>
+                      <TableHead className="text-center">Enviados</TableHead>
+                      <TableHead className="text-center">Falhas</TableHead>
+                      <TableHead className="text-right">Data</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {campaigns.map((campaign) => (
+                      <TableRow 
+                        key={campaign.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedCampaign(campaign.id);
+                          setShowFilters(true);
+                        }}
+                      >
+                        <TableCell>
+                          <p className="font-medium">{campaign.name}</p>
+                          {campaign.template_name && (
+                            <p className="text-xs text-muted-foreground">{campaign.template_name}</p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="gap-1">
+                            <Users className="h-3 w-3" />
+                            {campaign.contacts_count}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600">
+                            <CheckCircle className="h-3 w-3" />
+                            {campaign.sent_count}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {campaign.failed_count > 0 ? (
+                            <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600">
+                              <XCircle className="h-3 w-3" />
+                              {campaign.failed_count}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {format(new Date(campaign.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => openDeleteDialog(campaign, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </CardContent>
           </Card>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir campanha</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a campanha "{campaignToDelete?.name}"?
+                <br />
+                <span className="text-destructive font-medium">
+                  Todos os resultados associados também serão excluídos.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteCampaign}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  'Excluir'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
       <Footer />
     </div>
