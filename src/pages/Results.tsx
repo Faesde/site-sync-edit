@@ -45,8 +45,15 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
-  Trash2
+  Trash2,
+  Check
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -105,7 +112,7 @@ const Results = () => {
   const { user, loading: authLoading } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignResults, setCampaignResults] = useState<CampaignResult[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
   const [selectedChannel, setSelectedChannel] = useState<ChannelFilter>("all");
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -200,10 +207,31 @@ const Results = () => {
     };
   };
 
+  // Toggle campaign selection
+  const toggleCampaignSelection = (campaignId: string) => {
+    setSelectedCampaigns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(campaignId)) {
+        newSet.delete(campaignId);
+      } else {
+        newSet.add(campaignId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllCampaigns = () => {
+    setSelectedCampaigns(new Set(campaigns.map(c => c.id)));
+  };
+
+  const clearCampaignSelection = () => {
+    setSelectedCampaigns(new Set());
+  };
+
   // Filter results
   const filteredResults = campaignResults.filter(r => {
     const channelMatch = selectedChannel === 'all' || r.channel_type === selectedChannel;
-    const campaignMatch = selectedCampaign === 'all' || r.campaign_id === selectedCampaign;
+    const campaignMatch = selectedCampaigns.size === 0 || (r.campaign_id && selectedCampaigns.has(r.campaign_id));
     const searchMatch = !searchTerm || 
       r.contact_phone.includes(searchTerm) ||
       r.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -259,8 +287,12 @@ const Results = () => {
       setCampaigns((prev) => prev.filter((c) => c.id !== campaignToDelete.id));
       setCampaignResults((prev) => prev.filter((r) => r.campaign_id !== campaignToDelete.id));
 
-      if (selectedCampaign === campaignToDelete.id) {
-        setSelectedCampaign("all");
+      if (selectedCampaigns.has(campaignToDelete.id)) {
+        setSelectedCampaigns(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(campaignToDelete.id);
+          return newSet;
+        });
       }
 
       toast({
@@ -384,7 +416,7 @@ const Results = () => {
                 <CardTitle>Respostas das Campanhas</CardTitle>
                 <CardDescription>
                   {filteredResults.length} resultado{filteredResults.length !== 1 ? 's' : ''}
-                  {selectedCampaign !== 'all' && ` • ${campaigns.find(c => c.id === selectedCampaign)?.name}`}
+                  {selectedCampaigns.size > 0 && ` • ${selectedCampaigns.size} campanha${selectedCampaigns.size !== 1 ? 's' : ''} selecionada${selectedCampaigns.size !== 1 ? 's' : ''}`}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -421,19 +453,77 @@ const Results = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Campanha" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover max-h-[320px] overflow-y-auto">
-                    <SelectItem value="all">Todas as campanhas</SelectItem>
-                    {campaigns.map((campaign) => (
-                      <SelectItem key={campaign.id} value={campaign.id}>
-                        {campaign.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[220px] justify-between">
+                      <span className="truncate">
+                        {selectedCampaigns.size === 0 
+                          ? "Todas as campanhas" 
+                          : selectedCampaigns.size === 1
+                            ? campaigns.find(c => c.id === Array.from(selectedCampaigns)[0])?.name || "1 campanha"
+                            : `${selectedCampaigns.size} campanhas`}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start">
+                    <div className="p-2 border-b flex items-center justify-between gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={selectAllCampaigns}
+                        className="text-xs h-7"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Selecionar tudo
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={clearCampaignSelection}
+                        className="text-xs h-7"
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                    <ScrollArea className="h-[280px]">
+                      <div className="p-2 space-y-1">
+                        {campaigns.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Nenhuma campanha encontrada
+                          </p>
+                        ) : (
+                          campaigns.map((campaign) => (
+                            <div 
+                              key={campaign.id}
+                              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                              onClick={() => toggleCampaignSelection(campaign.id)}
+                            >
+                              <Checkbox 
+                                checked={selectedCampaigns.has(campaign.id)}
+                                onCheckedChange={() => toggleCampaignSelection(campaign.id)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{campaign.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(campaign.created_at), "dd/MM/yy", { locale: ptBR })} • {campaign.contacts_count} contatos
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => openDeleteDialog(campaign, e)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
                 <Select value={selectedChannel} onValueChange={(v) => setSelectedChannel(v as ChannelFilter)}>
                   <SelectTrigger className="w-[160px]">
                     <SelectValue placeholder="Canal" />
@@ -612,7 +702,7 @@ const Results = () => {
                         key={campaign.id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => {
-                          setSelectedCampaign(campaign.id);
+                          setSelectedCampaigns(new Set([campaign.id]));
                           setShowFilters(true);
                         }}
                       >
