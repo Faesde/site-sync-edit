@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -235,32 +236,31 @@ const Results = () => {
 
     setDeleting(true);
     try {
-      // Delete campaign results first
-      const { error: resultsError } = await supabaseWiki
-        .from('campaign_results')
-        .delete()
-        .eq('campaign_id', campaignToDelete.id)
-        .eq('user_id', user.id);
+      const { data: sessionRes, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const session = sessionRes.session;
+      if (!session) throw new Error("Sessão expirada. Faça login novamente.");
 
-      if (resultsError) {
-        console.error('Error deleting campaign results:', resultsError);
+      const { data, error } = await supabase.functions.invoke("delete-campaign", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          campaign_id: campaignToDelete.id,
+        },
+      });
+
+      if (error) throw error;
+      if (data && data.success === false) {
+        throw new Error(data.error || "Não foi possível excluir a campanha");
       }
 
-      // Delete the campaign
-      const { error: campaignError } = await supabaseWiki
-        .from('whatsapp_campaigns')
-        .delete()
-        .eq('id', campaignToDelete.id)
-        .eq('user_id', user.id);
-
-      if (campaignError) throw campaignError;
-
       // Update local state
-      setCampaigns(prev => prev.filter(c => c.id !== campaignToDelete.id));
-      setCampaignResults(prev => prev.filter(r => r.campaign_id !== campaignToDelete.id));
-      
+      setCampaigns((prev) => prev.filter((c) => c.id !== campaignToDelete.id));
+      setCampaignResults((prev) => prev.filter((r) => r.campaign_id !== campaignToDelete.id));
+
       if (selectedCampaign === campaignToDelete.id) {
-        setSelectedCampaign('all');
+        setSelectedCampaign("all");
       }
 
       toast({
@@ -268,11 +268,11 @@ const Results = () => {
         description: `A campanha "${campaignToDelete.name}" foi excluída com sucesso.`,
       });
     } catch (error: any) {
-      console.error('Error deleting campaign:', error);
+      console.error("Error deleting campaign:", error);
       toast({
         title: "Erro ao excluir",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setDeleting(false);
@@ -425,7 +425,7 @@ const Results = () => {
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Campanha" />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover">
+                  <SelectContent className="bg-popover max-h-[320px] overflow-y-auto">
                     <SelectItem value="all">Todas as campanhas</SelectItem>
                     {campaigns.map((campaign) => (
                       <SelectItem key={campaign.id} value={campaign.id}>

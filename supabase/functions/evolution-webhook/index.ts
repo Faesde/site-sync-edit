@@ -160,42 +160,22 @@ serve(async (req) => {
 
       console.log(`Linked to campaign: ${recentCampaign.campaign_name} (ID: ${recentCampaign.campaign_id})`);
 
-      // Check if we already have a 'received' response for this contact/campaign combination
-      const { data: existingResponse } = await supabase
-        .from('campaign_results')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('campaign_id', recentCampaign.campaign_id)
-        .in('contact_phone', contactPhoneCandidates)
-        .eq('status', 'received')
-        .limit(1)
-        .maybeSingle();
+      // Sempre salva no histórico (conversations)
+      await supabase
+        .from('whatsapp_conversations')
+        .insert({
+          user_id: userId,
+          contact_phone: contactPhone,
+          contact_name: pushName,
+          message_id: messageId,
+          direction: 'inbound',
+          message_type: messageType,
+          message_content: messageContent,
+          status: 'received',
+          campaign_id: recentCampaign.campaign_id,
+        });
 
-      if (existingResponse) {
-        console.log('Response already exists for this contact/campaign, skipping duplicate insert.');
-        
-        // Still save to conversations for chat history
-        await supabase
-          .from('whatsapp_conversations')
-          .insert({
-            user_id: userId,
-            contact_phone: contactPhone,
-            contact_name: pushName,
-            message_id: messageId,
-            direction: 'inbound',
-            message_type: messageType,
-            message_content: messageContent,
-            status: 'received',
-            campaign_id: recentCampaign.campaign_id,
-          });
-
-        return new Response(
-          JSON.stringify({ success: true, message: 'Duplicate response skipped, saved to conversations' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Insert the FIRST response into campaign_results (using raw_payload instead of external_id)
+      // Insere a resposta em campaign_results
       const { error: insertError } = await supabase
         .from('campaign_results')
         .insert({
@@ -218,23 +198,38 @@ serve(async (req) => {
 
       if (insertError) {
         console.error('Error inserting response:', insertError);
-      } else {
-        console.log('First response saved successfully');
+        return new Response(
+          JSON.stringify({ success: false, error: 'Insert failed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      await supabase
-        .from('whatsapp_conversations')
-        .insert({
-          user_id: userId,
-          contact_phone: contactPhone,
-          contact_name: pushName,
-          message_id: messageId,
-          direction: 'inbound',
-          message_type: messageType,
-          message_content: messageContent,
-          status: 'received',
-          campaign_id: recentCampaign.campaign_id,
-        });
+      // Mantém SOMENTE as 3 últimas respostas por contato/campanha
+      const { data: olderReceived, error: olderErr } = await supabase
+        .from('campaign_results')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('campaign_id', recentCampaign.campaign_id)
+        .in('contact_phone', contactPhoneCandidates)
+        .eq('status', 'received')
+        .order('created_at', { ascending: false })
+        .range(3, 200);
+
+      if (olderErr) {
+        console.error('Error selecting old received messages:', olderErr);
+      } else if (olderReceived && olderReceived.length > 0) {
+        const idsToDelete = olderReceived.map((r) => r.id);
+        const { error: pruneErr } = await supabase
+          .from('campaign_results')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (pruneErr) {
+          console.error('Error pruning old received messages:', pruneErr);
+        } else {
+          console.log(`Pruned ${idsToDelete.length} old received messages (keeping last 3).`);
+        }
+      }
     }
 
     // Handle message status updates (using raw_payload->>message_id instead of external_id)
