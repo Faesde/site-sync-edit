@@ -156,6 +156,7 @@ const Contacts = () => {
     id: string;
     name: string;
     content: string;
+    poll_options?: string[] | null;
   }
   const [evolutionInstances, setEvolutionInstances] = useState<EvolutionInstance[]>([]);
   const [evolutionTemplates, setEvolutionTemplates] = useState<EvolutionTemplate[]>([]);
@@ -311,7 +312,7 @@ const Contacts = () => {
             // Load Evolution templates
             const { data: evoTemplatesData } = await supabaseWiki
               .from('evolution_templates')
-              .select('id, name, content')
+              .select('id, name, content, poll_options')
               .eq('user_id', user.id)
               .order('name');
             
@@ -694,6 +695,13 @@ const Contacts = () => {
               template_id: selectedActions.includes('whatsapp') ? (selectedTemplateId || null) : null,
               template_name: selectedActions.includes('whatsapp') ? (selectedTemplate?.name || null) : (selectedActions.includes('call') ? 'Ligação' : null),
               contacts_count: selectedContacts.length,
+              poll_options: (() => {
+                if (whatsappProvider === 'evolution' && evolutionMessageMode === 'template' && selectedEvolutionTemplateId) {
+                  const evoTpl = evolutionTemplates.find(t => t.id === selectedEvolutionTemplateId);
+                  return evoTpl?.poll_options || null;
+                }
+                return null;
+              })(),
             });
           
           if (campaignError) {

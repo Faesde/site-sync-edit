@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PollResultsModal } from "@/components/PollResultsModal";
 import { 
   Table,
   TableBody,
@@ -46,7 +47,8 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
-  Check
+  Check,
+  BarChart3
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -66,6 +68,7 @@ interface Campaign {
   sent_count: number;
   failed_count: number;
   created_at: string;
+  poll_options: string[] | null;
 }
 
 interface CampaignResult {
@@ -123,6 +126,7 @@ const Results = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [pollChartCampaign, setPollChartCampaign] = useState<Campaign | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -754,7 +758,7 @@ const Results = () => {
                       <TableHead className="text-center">Enviados</TableHead>
                       <TableHead className="text-center">Falhas</TableHead>
                       <TableHead className="text-right">Data</TableHead>
-                      <TableHead className="w-[60px]"></TableHead>
+                      <TableHead className="w-[100px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -799,14 +803,30 @@ const Results = () => {
                           {format(new Date(campaign.created_at), "dd/MM/yyyy", { locale: ptBR })}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => openDeleteDialog(campaign, e)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {campaign.poll_options && campaign.poll_options.length > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPollChartCampaign(campaign);
+                                }}
+                                title="Ver gráfico de respostas"
+                              >
+                                <BarChart3 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => openDeleteDialog(campaign, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -849,6 +869,19 @@ const Results = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Poll Results Chart Modal */}
+        {pollChartCampaign && pollChartCampaign.poll_options && (
+          <PollResultsModal
+            open={!!pollChartCampaign}
+            onOpenChange={(open) => !open && setPollChartCampaign(null)}
+            campaignName={pollChartCampaign.name}
+            pollOptions={pollChartCampaign.poll_options}
+            responses={campaignResults
+              .filter(r => r.campaign_id === pollChartCampaign.id)
+              .map(r => ({ message_content: r.message_content, status: r.status }))}
+          />
+        )}
       </main>
       <Footer />
     </div>
