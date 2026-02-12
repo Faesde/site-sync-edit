@@ -50,3 +50,9 @@ verify_jwt = false
 
 [functions.admin-update-user-password]
 verify_jwt = false
+
+[functions.evolution-send-campaign]
+verify_jwt = false
+
+[functions.delete-campaign]
+verify_jwt = false

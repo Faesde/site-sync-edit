@@ -845,20 +845,14 @@ const Contacts = () => {
             console.error('Erro ao enviar WhatsApp via Edge Function:', error);
           }
         } else if (selectedActions.includes('whatsapp') && whatsappProvider === 'evolution') {
-          // Send via Evolution API with real-time progress
+          // Send via Evolution API — SERVER-SIDE processing
           try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-              console.error('Sessão expirada');
-              toast({
-                title: "Erro",
-                description: "Sessão expirada. Faça login novamente.",
-                variant: "destructive"
-              });
+              toast({ title: "Erro", description: "Sessão expirada. Faça login novamente.", variant: "destructive" });
               return;
             }
 
-            // Get message body from template or custom message
             let messageBody = '';
             if (evolutionMessageMode === 'template' && selectedEvolutionTemplateId) {
               const selectedEvTemplate = evolutionTemplates.find(t => t.id === selectedEvolutionTemplateId);
@@ -868,283 +862,114 @@ const Contacts = () => {
             }
 
             if (!messageBody) {
-              toast({
-                title: "Erro",
-                description: "Nenhuma mensagem definida. Selecione um template ou escreva uma mensagem.",
-                variant: "destructive"
-              });
+              toast({ title: "Erro", description: "Nenhuma mensagem definida.", variant: "destructive" });
               return;
             }
-
             if (!selectedEvolutionInstanceId) {
-              toast({
-                title: "Erro",
-                description: "Selecione uma instância do WhatsApp para enviar.",
-                variant: "destructive"
-              });
+              toast({ title: "Erro", description: "Selecione uma instância do WhatsApp.", variant: "destructive" });
               return;
             }
 
-            // Calculate interval range in milliseconds
             const multiplier = sendIntervalUnit === 'minutes' ? 60 * 1000 : 1000;
-            const intervalMinMs = sendIntervalMin * multiplier;
-            const intervalMaxMs = sendIntervalMax * multiplier;
-
-            // Helper: get random delay between min and max, with warmup support
-            const getRandomDelay = (messageIndex: number) => {
-              let effectiveMaxMs = intervalMaxMs;
-              
-              // Progressive warmup: use higher max delay for first N messages
-              if (warmupEnabled && messageIndex < warmupMessages) {
-                const warmupMaxMs = warmupMaxDelay * 1000; // warmupMaxDelay is always in seconds
-                effectiveMaxMs = Math.max(intervalMaxMs, warmupMaxMs);
-              }
-              
-              return Math.floor(Math.random() * (effectiveMaxMs - intervalMinMs + 1)) + intervalMinMs;
-            };
-
-            // Helper: get current hour in Brasília timezone
-            const getBrasiliaHour = (): number => {
-              const now = new Date();
-              const brasiliaTime = new Intl.DateTimeFormat('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
-                hour: 'numeric',
-                hour12: false,
-              }).format(now);
-              return parseInt(brasiliaTime, 10);
-            };
-
-            // Helper: check if we're in night pause window
-            const isNightTime = (): boolean => {
-              if (!nightPauseEnabled) return false;
-              const hour = getBrasiliaHour();
-              if (nightPauseStart < nightPauseEnd) {
-                return hour >= nightPauseStart && hour < nightPauseEnd;
-              }
-              // Handles wrap-around (e.g., 22:00 - 06:00)
-              return hour >= nightPauseStart || hour < nightPauseEnd;
-            };
-
-            // Helper: wait until night pause ends
-            const waitForNightEnd = async () => {
-              setIsPaused(true);
-              isPausedRef.current = true;
-              setPauseReason(`Pausa noturna ativa (${nightPauseStart}h - ${nightPauseEnd}h). Retomará automaticamente às ${nightPauseEnd}h.`);
-
-              while (isNightTime()) {
-                await new Promise(resolve => setTimeout(resolve, 60000)); // check every minute
-              }
-
-              setIsPaused(false);
-              isPausedRef.current = false;
-              setPauseReason(null);
-              toast({ title: "Bom dia! ☀️", description: "Retomando envio da campanha..." });
-            };
-
-            // Helper: check instance connection status
-            const checkConnection = async (): Promise<boolean> => {
-              try {
-                const statusResp = await supabase.functions.invoke('evolution-check-status', {
-                  headers: { Authorization: `Bearer ${session.access_token}` },
-                  body: { instance_id: selectedEvolutionInstanceId },
-                });
-                return statusResp.data?.status === 'connected';
-              } catch {
-                return false;
-              }
-            };
-
-            // Reset pause and cancel state
-            setIsPaused(false);
-            isPausedRef.current = false;
-            setPauseReason(null);
-            cancelCampaignRef.current = false;
 
             // Initialize progress modal
             setCampaignProgress({
               totalContacts: selectedContacts.length,
               sentCount: 0,
               failedCount: 0,
-              currentContact: '',
+              currentContact: 'Iniciando envio no servidor...',
               isComplete: false,
               campaignName: campaignName,
             });
             setShowProgressModal(true);
             setIsRunningInBackground(false);
+            setIsPaused(false);
+            setPauseReason(null);
+            cancelCampaignRef.current = false;
 
-            // Send messages one by one with progress tracking
-            let sentCount = 0;
-            let failedCount = 0;
-
-            for (let i = 0; i < selectedContacts.length; i++) {
-              // Check if campaign was cancelled
-              if (cancelCampaignRef.current) {
-                toast({
-                  title: "Campanha cancelada",
-                  description: `${sentCount} enviadas, ${failedCount} falhas antes do cancelamento.`,
-                  variant: "destructive",
-                });
-                setCampaignProgress(prev => ({ ...prev, isComplete: true, currentContact: '' }));
-                if (user) {
-                  await supabaseWiki.from('whatsapp_campaigns').update({ sent_count: sentCount, failed_count: failedCount }).eq('id', unifiedCampaignId);
-                }
-                return;
-              }
-
-              const contact = selectedContacts[i];
-              
-              // Update current contact
-              setCampaignProgress(prev => ({
-                ...prev,
-                currentContact: contact.name || contact.phone,
-              }));
-
-              try {
-                // Apply variable mappings per contact
-                let resolvedMessage = messageBody;
-                for (const mapping of evolutionVariableMappings) {
-                  let value = '';
-                  switch (mapping.source) {
-                    case 'name': value = contact.name || ''; break;
-                    case 'phone': value = contact.phone || ''; break;
-                    case 'email': value = contact.email || ''; break;
-                    case 'custom': value = mapping.customValue || ''; break;
-                  }
-                  resolvedMessage = resolvedMessage.split(mapping.variable).join(value);
-                }
-
-                const response = await supabase.functions.invoke('evolution-send-message', {
-                  headers: {
-                    Authorization: `Bearer ${session.access_token}`,
-                  },
-                  body: {
-                    instance_id: selectedEvolutionInstanceId,
-                    campaign_id: unifiedCampaignId,
-                    campaign_name: campaignName,
-                    contacts: [{ name: contact.name, phone: contact.phone, email: contact.email }],
-                    message_body: resolvedMessage,
-                    template_id: selectedEvolutionTemplateId,
-                  },
-                });
-
-                if (response.error || !response.data?.success) {
-                  failedCount++;
-                } else {
-                  sentCount += response.data.sent || 1;
-                  if (response.data.failed) {
-                    failedCount += response.data.failed;
-                  }
-                }
-              } catch (error) {
-                console.error('Erro ao enviar para:', contact.phone, error);
-                failedCount++;
-              }
-
-              // Update progress
-              setCampaignProgress(prev => ({
-                ...prev,
-                sentCount,
-                failedCount,
-              }));
-
-              // Wait for random interval before next message (except for last one)
-              if (i < selectedContacts.length - 1) {
-                // Check for night pause before sending next message
-                if (isNightTime()) {
-                  await waitForNightEnd();
-                }
-
-                const delay = getRandomDelay(i);
-                await new Promise(resolve => setTimeout(resolve, delay));
-
-                // Check connection every 10 messages
-                if ((i + 1) % 10 === 0) {
-                  const isConnected = await checkConnection();
-                  if (!isConnected) {
-                    setIsPaused(true);
-                    isPausedRef.current = true;
-                    setPauseReason('Conexão com WhatsApp perdida. Aguardando reconexão...');
-                    setCampaignProgress(prev => ({
-                      ...prev,
-                      currentContact: '⚠️ Pausado - Aguardando reconexão...',
-                    }));
-
-                    // Wait and retry connection
-                    let reconnected = false;
-                    for (let retry = 0; retry < 60; retry++) { // try for 10 minutes
-                      await new Promise(resolve => setTimeout(resolve, 10000)); // 10s
-                      const ok = await checkConnection();
-                      if (ok) {
-                        reconnected = true;
-                        break;
-                      }
-                    }
-
-                    if (!reconnected) {
-                      // Save progress and stop
-                      setCampaignProgress(prev => ({
-                        ...prev,
-                        isComplete: true,
-                        currentContact: '',
-                      }));
-                      toast({
-                        title: "Campanha pausada",
-                        description: `Conexão não restaurada. ${sentCount} enviadas até agora.`,
-                        variant: "destructive",
-                      });
-                      // Update campaign stats with partial progress
-                      if (user) {
-                        await supabaseWiki
-                          .from('whatsapp_campaigns')
-                          .update({ sent_count: sentCount, failed_count: failedCount })
-                          .eq('id', unifiedCampaignId);
-                      }
-                      return;
-                    }
-
-                    // Resumed
-                    setIsPaused(false);
-                    isPausedRef.current = false;
-                    setPauseReason(null);
-                    toast({ title: "Reconectado!", description: "Continuando envio da campanha..." });
-                  }
-                }
-              }
-            }
-
-            // Mark as complete
-            setCampaignProgress(prev => ({
-              ...prev,
-              isComplete: true,
-              currentContact: '',
-            }));
-
-            // Update campaign stats
-            if (user) {
-              await supabaseWiki
-                .from('whatsapp_campaigns')
-                .update({
-                  sent_count: sentCount,
-                  failed_count: failedCount,
-                })
-                .eq('id', unifiedCampaignId);
-            }
-
-            toast({
-              title: "Campanha finalizada!",
-              description: `${sentCount} enviadas, ${failedCount} falhas.`,
+            // Start server-side job
+            const startResp = await supabase.functions.invoke('evolution-send-campaign', {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+              body: {
+                action: 'start',
+                campaign_id: unifiedCampaignId,
+                campaign_name: campaignName,
+                instance_id: selectedEvolutionInstanceId,
+                contacts: selectedContacts.map(c => ({ name: c.name, phone: c.phone, email: c.email })),
+                message_body: messageBody,
+                template_id: selectedEvolutionTemplateId,
+                variable_mappings: evolutionVariableMappings.map(m => ({
+                  variable: m.variable, source: m.source, customValue: m.customValue,
+                })),
+                delay_min_ms: sendIntervalMin * multiplier,
+                delay_max_ms: sendIntervalMax * multiplier,
+                warmup_enabled: warmupEnabled,
+                warmup_messages: warmupMessages,
+                warmup_max_delay_ms: warmupMaxDelay * 1000,
+                night_pause_enabled: nightPauseEnabled,
+                night_pause_start: nightPauseStart,
+                night_pause_end: nightPauseEnd,
+              },
             });
+
+            if (startResp.error || !startResp.data?.success) {
+              throw new Error(startResp.data?.error || 'Erro ao iniciar campanha');
+            }
+
+            const jobId = startResp.data.job_id;
+
+            // Poll for progress from DB
+            const pollInterval = setInterval(async () => {
+              try {
+                const { data: job } = await supabaseWiki
+                  .from('campaign_jobs')
+                  .select('*')
+                  .eq('id', jobId)
+                  .single();
+
+                if (!job) return;
+
+                setCampaignProgress(prev => ({
+                  ...prev,
+                  sentCount: job.sent_count || 0,
+                  failedCount: job.failed_count || 0,
+                  currentContact: job.current_contact || '',
+                  isComplete: job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed',
+                }));
+
+                setIsPaused(job.status === 'paused');
+                setPauseReason(job.status === 'paused' ? (job.current_contact || 'Pausado') : null);
+
+                if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed') {
+                  clearInterval(pollInterval);
+                  const desc = job.status === 'cancelled'
+                    ? `Cancelada. ${job.sent_count} enviadas, ${job.failed_count} falhas.`
+                    : job.status === 'failed'
+                    ? `Falhou. ${job.sent_count} enviadas até o momento.`
+                    : `${job.sent_count} enviadas, ${job.failed_count} falhas.`;
+                  toast({
+                    title: job.status === 'completed' ? "Campanha finalizada!" : job.status === 'cancelled' ? "Campanha cancelada" : "Campanha falhou",
+                    description: desc,
+                    variant: job.status === 'completed' ? undefined : 'destructive',
+                  });
+                }
+              } catch (err) {
+                console.error('Polling error:', err);
+              }
+            }, 3000);
+
+            // Store jobId and pollInterval for cancel action
+            cancelCampaignRef.current = false;
+            // Override cancel to call edge function
+            (window as any).__currentCampaignJobId = jobId;
+            (window as any).__currentCampaignPollInterval = pollInterval;
 
           } catch (error) {
             console.error('Erro ao enviar WhatsApp via Evolution:', error);
-            toast({
-              title: "Erro",
-              description: "Erro ao enviar mensagens. Tente novamente.",
-              variant: "destructive"
-            });
+            toast({ title: "Erro", description: "Erro ao iniciar campanha. Tente novamente.", variant: "destructive" });
             setCampaignProgress(prev => ({ ...prev, isComplete: true }));
           }
-          return; // Don't show old processing modal
+          return;
         }
 
         // Se há outras ações além de WhatsApp, envia para o webhook padrão
@@ -2321,7 +2146,21 @@ const Contacts = () => {
             setShowProgressModal(false);
             navigate('/results');
           }}
-          onCancel={() => {
+          onCancel={async () => {
+            const jobId = (window as any).__currentCampaignJobId;
+            if (jobId) {
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                await supabase.functions.invoke('evolution-send-campaign', {
+                  headers: { Authorization: `Bearer ${session?.access_token}` },
+                  body: { action: 'cancel', job_id: jobId },
+                });
+                const pollInterval = (window as any).__currentCampaignPollInterval;
+                if (pollInterval) clearInterval(pollInterval);
+              } catch (err) {
+                console.error('Cancel error:', err);
+              }
+            }
             cancelCampaignRef.current = true;
           }}
         />
