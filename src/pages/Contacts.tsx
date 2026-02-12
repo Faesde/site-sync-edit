@@ -2031,6 +2031,10 @@ const Contacts = () => {
               campaignName: '',
             });
           }}
+          onShowResults={() => {
+            setShowProgressModal(false);
+            navigate('/results');
+          }}
         />
       </main>
     </div>
