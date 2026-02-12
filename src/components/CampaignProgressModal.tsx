@@ -25,6 +25,7 @@ interface CampaignProgressModalProps {
   onContinueInBackground: () => void;
   onNewCampaign: () => void;
   onShowResults?: () => void;
+  onCancel?: () => void;
   campaignName: string;
 }
 
@@ -40,6 +41,7 @@ export const CampaignProgressModal = ({
   onContinueInBackground,
   onNewCampaign,
   onShowResults,
+  onCancel,
   campaignName,
 }: CampaignProgressModalProps) => {
   const [showComplete, setShowComplete] = useState(false);
@@ -176,6 +178,16 @@ export const CampaignProgressModal = ({
                 <Clock className="w-4 h-4 mr-2" />
                 Continuar em Background
               </Button>
+              {onCancel && (
+                <Button 
+                  variant="destructive" 
+                  onClick={onCancel}
+                  className="w-full"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Cancelar Campanha
+                </Button>
+              )}
               <p className="text-xs text-center text-muted-foreground">
                 O envio continuará mesmo se você sair desta tela
               </p>
