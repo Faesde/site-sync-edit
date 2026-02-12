@@ -183,6 +183,16 @@ const Contacts = () => {
   const [sendIntervalMax, setSendIntervalMax] = useState<number>(60);
   const [sendIntervalUnit, setSendIntervalUnit] = useState<'seconds' | 'minutes'>('seconds');
   
+  // Night pause configuration
+  const [nightPauseEnabled, setNightPauseEnabled] = useState(true);
+  const [nightPauseStart, setNightPauseStart] = useState(0); // 0 = midnight
+  const [nightPauseEnd, setNightPauseEnd] = useState(7); // 7 = 7am
+  
+  // Progressive warmup configuration
+  const [warmupEnabled, setWarmupEnabled] = useState(true);
+  const [warmupMessages, setWarmupMessages] = useState(200);
+  const [warmupMaxDelay, setWarmupMaxDelay] = useState(120); // seconds
+  
   // Campaign progress tracking
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [campaignProgress, setCampaignProgress] = useState({
@@ -879,8 +889,45 @@ const Contacts = () => {
             const intervalMinMs = sendIntervalMin * multiplier;
             const intervalMaxMs = sendIntervalMax * multiplier;
 
-            // Helper: get random delay between min and max
-            const getRandomDelay = () => Math.floor(Math.random() * (intervalMaxMs - intervalMinMs + 1)) + intervalMinMs;
+            // Helper: get random delay between min and max, with warmup support
+            const getRandomDelay = (messageIndex: number) => {
+              let effectiveMaxMs = intervalMaxMs;
+              
+              // Progressive warmup: use higher max delay for first N messages
+              if (warmupEnabled && messageIndex < warmupMessages) {
+                const warmupMaxMs = warmupMaxDelay * 1000; // warmupMaxDelay is always in seconds
+                effectiveMaxMs = Math.max(intervalMaxMs, warmupMaxMs);
+              }
+              
+              return Math.floor(Math.random() * (effectiveMaxMs - intervalMinMs + 1)) + intervalMinMs;
+            };
+
+            // Helper: check if we're in night pause window
+            const isNightTime = (): boolean => {
+              if (!nightPauseEnabled) return false;
+              const hour = new Date().getHours();
+              if (nightPauseStart < nightPauseEnd) {
+                return hour >= nightPauseStart && hour < nightPauseEnd;
+              }
+              // Handles wrap-around (e.g., 22:00 - 06:00)
+              return hour >= nightPauseStart || hour < nightPauseEnd;
+            };
+
+            // Helper: wait until night pause ends
+            const waitForNightEnd = async () => {
+              setIsPaused(true);
+              isPausedRef.current = true;
+              setPauseReason(`Pausa noturna ativa (${nightPauseStart}h - ${nightPauseEnd}h). Retomará automaticamente às ${nightPauseEnd}h.`);
+
+              while (isNightTime()) {
+                await new Promise(resolve => setTimeout(resolve, 60000)); // check every minute
+              }
+
+              setIsPaused(false);
+              isPausedRef.current = false;
+              setPauseReason(null);
+              toast({ title: "Bom dia! ☀️", description: "Retomando envio da campanha..." });
+            };
 
             // Helper: check instance connection status
             const checkConnection = async (): Promise<boolean> => {
@@ -975,7 +1022,12 @@ const Contacts = () => {
 
               // Wait for random interval before next message (except for last one)
               if (i < selectedContacts.length - 1) {
-                const delay = getRandomDelay();
+                // Check for night pause before sending next message
+                if (isNightTime()) {
+                  await waitForNightEnd();
+                }
+
+                const delay = getRandomDelay(i);
                 await new Promise(resolve => setTimeout(resolve, delay));
 
                 // Check connection every 10 messages
@@ -1688,6 +1740,106 @@ const Contacts = () => {
                         <p className="text-xs text-muted-foreground mt-1">
                           ⚡ Verificação automática de conexão a cada 10 mensagens — pausa e retoma automaticamente
                         </p>
+
+                        {/* Night Pause Config */}
+                        <div className="mt-4 pt-3 border-t border-accent/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">🌙</span>
+                              <Label className="text-xs font-medium text-accent-foreground">Pausa Noturna</Label>
+                            </div>
+                            <Checkbox
+                              checked={nightPauseEnabled}
+                              onCheckedChange={(checked) => setNightPauseEnabled(!!checked)}
+                            />
+                          </div>
+                          {nightPauseEnabled && (
+                            <div className="flex items-center gap-3 mt-2">
+                              <div className="flex-1">
+                                <Label className="text-xs text-muted-foreground mb-1 block">Pausa às</Label>
+                                <Select
+                                  value={String(nightPauseStart)}
+                                  onValueChange={(v) => setNightPauseStart(parseInt(v))}
+                                >
+                                  <SelectTrigger className="bg-card/50 border-accent/30 h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => (
+                                      <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex-1">
+                                <Label className="text-xs text-muted-foreground mb-1 block">Retoma às</Label>
+                                <Select
+                                  value={String(nightPauseEnd)}
+                                  onValueChange={(v) => setNightPauseEnd(parseInt(v))}
+                                >
+                                  <SelectTrigger className="bg-card/50 border-accent/30 h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from({ length: 24 }, (_, i) => (
+                                      <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {nightPauseEnabled
+                              ? `Envios pausam das ${String(nightPauseStart).padStart(2, '0')}h às ${String(nightPauseEnd).padStart(2, '0')}h para simular comportamento humano`
+                              : 'Desativada — envios rodarão 24h sem parar'}
+                          </p>
+                        </div>
+
+                        {/* Progressive Warmup Config */}
+                        <div className="mt-3 pt-3 border-t border-accent/20">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">🔥</span>
+                              <Label className="text-xs font-medium text-accent-foreground">Aquecimento Progressivo</Label>
+                            </div>
+                            <Checkbox
+                              checked={warmupEnabled}
+                              onCheckedChange={(checked) => setWarmupEnabled(!!checked)}
+                            />
+                          </div>
+                          {warmupEnabled && (
+                            <div className="flex items-center gap-3 mt-2">
+                              <div className="flex-1">
+                                <Label className="text-xs text-muted-foreground mb-1 block">Primeiras msgs</Label>
+                                <Input
+                                  type="number"
+                                  min={10}
+                                  max={1000}
+                                  value={warmupMessages}
+                                  onChange={(e) => setWarmupMessages(Math.max(10, parseInt(e.target.value) || 200))}
+                                  className="bg-card/50 border-accent/30 h-8 text-xs"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <Label className="text-xs text-muted-foreground mb-1 block">Delay máx. (seg)</Label>
+                                <Input
+                                  type="number"
+                                  min={30}
+                                  max={300}
+                                  value={warmupMaxDelay}
+                                  onChange={(e) => setWarmupMaxDelay(Math.max(30, parseInt(e.target.value) || 120))}
+                                  className="bg-card/50 border-accent/30 h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {warmupEnabled
+                              ? `Nas primeiras ${warmupMessages} mensagens, delay máximo será ${warmupMaxDelay}s para aquecer o chip`
+                              : 'Desativado — delay normal desde a primeira mensagem'}
+                          </p>
+                        </div>
                       </div>
                     </motion.div>
                   )}
