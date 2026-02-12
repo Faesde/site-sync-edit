@@ -535,7 +535,7 @@ const Results = () => {
                       pollOptions={activeCampaign.poll_options}
                       responses={campaignResults
                         .filter(r => r.campaign_id === activeCampaignId)
-                        .map(r => ({ message_content: r.message_content, status: r.status }))}
+                        .map(r => ({ message_content: r.message_content, status: r.status, contact_phone: r.contact_phone, created_at: r.created_at }))}
                     />
                   </CardContent>
                 )}
@@ -797,19 +797,34 @@ const Results = () => {
 /* Inline poll chart component */
 const InlinePollChart: React.FC<{
   pollOptions: string[];
-  responses: Array<{ message_content: string | null; status: string }>;
+  responses: Array<{ message_content: string | null; status: string; contact_phone: string; created_at: string }>;
 }> = ({ pollOptions, responses }) => {
   const receivedResponses = responses.filter(r => r.status === "received" && r.message_content);
   
+  // Group by contact, then pick the first message that matches a valid option
+  const validOptions = new Set(pollOptions.map((_, i) => String(i + 1)));
+  
+  const contactGroups = new Map<string, typeof receivedResponses>();
+  receivedResponses.forEach(r => {
+    const phone = r.contact_phone.replace(/\D/g, '');
+    if (!contactGroups.has(phone)) contactGroups.set(phone, []);
+    contactGroups.get(phone)!.push(r);
+  });
+
   const counts: Record<string, number> = {};
   pollOptions.forEach((_, i) => { counts[String(i + 1)] = 0; });
   let otherCount = 0;
+  let votedContacts = 0;
 
-  receivedResponses.forEach(r => {
-    const content = r.message_content?.trim() || "";
-    if (counts[content] !== undefined) {
-      counts[content]++;
+  contactGroups.forEach((messages) => {
+    // Sort by date ascending (oldest first) to find the first valid answer
+    messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const validMsg = messages.find(m => validOptions.has(m.message_content?.trim() || ""));
+    if (validMsg) {
+      counts[validMsg.message_content!.trim()]++;
+      votedContacts++;
     } else {
+      // None of the messages matched a valid option
       otherCount++;
     }
   });
@@ -822,7 +837,7 @@ const InlinePollChart: React.FC<{
     data.push({ option: "Outras", count: otherCount });
   }
 
-  const totalResponses = receivedResponses.length;
+  const totalResponses = contactGroups.size;
 
   if (totalResponses === 0) {
     return (
