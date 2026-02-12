@@ -511,15 +511,15 @@ const Results = () => {
               </Card>
             </div>
 
-            {/* Poll chart button + inline chart */}
-            {activeCampaign?.poll_options && activeCampaign.poll_options.length > 0 && (
-              <Card className="mb-6">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5" />
-                      Gráfico de Respostas da Enquete
-                    </CardTitle>
+            {/* Poll chart section */}
+            <Card className="mb-6">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Gráfico de Respostas da Enquete
+                  </CardTitle>
+                  {activeCampaign?.poll_options && activeCampaign.poll_options.length > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -527,9 +527,11 @@ const Results = () => {
                     >
                       {showPollChart ? 'Ocultar' : 'Ver Gráfico'}
                     </Button>
-                  </div>
-                </CardHeader>
-                {showPollChart && (
+                  )}
+                </div>
+              </CardHeader>
+              {activeCampaign?.poll_options && activeCampaign.poll_options.length > 0 ? (
+                showPollChart && (
                   <CardContent>
                     <InlinePollChart
                       pollOptions={activeCampaign.poll_options}
@@ -538,9 +540,19 @@ const Results = () => {
                         .map(r => ({ message_content: r.message_content, status: r.status, contact_phone: r.contact_phone, created_at: r.created_at }))}
                     />
                   </CardContent>
-                )}
-              </Card>
-            )}
+                )
+              ) : (
+                <CardContent>
+                  <div className="text-center py-6 text-muted-foreground">
+                    <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="font-medium text-sm">Enquete não configurada</p>
+                    <p className="text-xs mt-1">
+                      Para visualizar gráficos, configure as opções de enquete no template antes de enviar a campanha.
+                    </p>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
 
             {/* Filters */}
             <Card>
