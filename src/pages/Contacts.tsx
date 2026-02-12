@@ -185,7 +185,7 @@ const Contacts = () => {
   
   // Night pause configuration
   const [nightPauseEnabled, setNightPauseEnabled] = useState(true);
-  const [nightPauseStart, setNightPauseStart] = useState(0); // 0 = midnight
+  const [nightPauseStart, setNightPauseStart] = useState(21); // 21 = 9pm
   const [nightPauseEnd, setNightPauseEnd] = useState(7); // 7 = 7am
   
   // Progressive warmup configuration
