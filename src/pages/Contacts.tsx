@@ -172,6 +172,7 @@ const Contacts = () => {
     customValue?: string;
   }
   const [variableMappings, setVariableMappings] = useState<VariableMapping[]>([]);
+  const [evolutionVariableMappings, setEvolutionVariableMappings] = useState<VariableMapping[]>([]);
 
   // Campaign name modal
   const [showCampaignModal, setShowCampaignModal] = useState(false);
@@ -239,7 +240,28 @@ const Contacts = () => {
     }
   }, [ivrIntroMessage]);
 
-  // Aguarda carregar profile/role antes de decidir acesso
+  // Update Evolution variable mappings when template or custom message changes
+  useEffect(() => {
+    let content = '';
+    if (evolutionMessageMode === 'template' && selectedEvolutionTemplateId) {
+      const tpl = evolutionTemplates.find(t => t.id === selectedEvolutionTemplateId);
+      content = tpl?.content || '';
+    } else if (evolutionMessageMode === 'custom') {
+      content = evolutionCustomMessage;
+    }
+    const variables = extractTemplateVariables(content);
+    if (variables.length > 0) {
+      const newMappings: VariableMapping[] = variables.map((v, index) => {
+        const existing = evolutionVariableMappings.find(m => m.variable === v);
+        if (existing) return existing;
+        return { variable: v, source: index === 0 ? 'name' : 'custom' as VariableSource, customValue: '' };
+      });
+      setEvolutionVariableMappings(newMappings);
+    } else {
+      setEvolutionVariableMappings([]);
+    }
+  }, [selectedEvolutionTemplateId, evolutionTemplates, evolutionMessageMode, evolutionCustomMessage]);
+
   const isLoadingAccess = loading || (user && role === null);
   const isAdmin = role === 'admin';
   const hasAccess = isSubscribed || isAdmin;
@@ -871,6 +893,19 @@ const Contacts = () => {
               }));
 
               try {
+                // Apply variable mappings per contact
+                let resolvedMessage = messageBody;
+                for (const mapping of evolutionVariableMappings) {
+                  let value = '';
+                  switch (mapping.source) {
+                    case 'name': value = contact.name || ''; break;
+                    case 'phone': value = contact.phone || ''; break;
+                    case 'email': value = contact.email || ''; break;
+                    case 'custom': value = mapping.customValue || ''; break;
+                  }
+                  resolvedMessage = resolvedMessage.split(mapping.variable).join(value);
+                }
+
                 const response = await supabase.functions.invoke('evolution-send-message', {
                   headers: {
                     Authorization: `Bearer ${session.access_token}`,
@@ -880,7 +915,7 @@ const Contacts = () => {
                     campaign_id: unifiedCampaignId,
                     campaign_name: campaignName,
                     contacts: [{ name: contact.name, phone: contact.phone, email: contact.email }],
-                    message_body: messageBody,
+                    message_body: resolvedMessage,
                     template_id: selectedEvolutionTemplateId,
                   },
                 });
@@ -1441,8 +1476,57 @@ const Contacts = () => {
                                   className="w-full min-h-[100px] p-3 rounded-lg bg-card/50 border border-green-500/30 text-foreground placeholder:text-muted-foreground resize-y"
                                 />
                                 <p className="text-xs text-muted-foreground mt-2">
-                                  Variáveis disponíveis: {'{{1}}'} = Nome, {'{{2}}'} = Telefone, {'{{3}}'} = Email
+                                  Use {'{{1}}'}, {'{{2}}'}, etc. para variáveis dinâmicas.
                                 </p>
+                              </div>
+                            )}
+
+                            {/* Evolution Variable Mappings */}
+                            {evolutionVariableMappings.length > 0 && (
+                              <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                                <p className="text-xs text-yellow-400 font-medium mb-3">
+                                  ⚠️ Esta mensagem possui variáveis. Mapeie cada uma:
+                                </p>
+                                <div className="space-y-2">
+                                  {evolutionVariableMappings.map((mapping, index) => (
+                                    <div key={mapping.variable} className="flex items-center gap-2">
+                                      <span className="text-sm font-mono bg-yellow-500/20 px-2 py-1 rounded text-yellow-300 min-w-[50px] text-center">
+                                        {mapping.variable}
+                                      </span>
+                                      <span className="text-muted-foreground text-sm">=</span>
+                                      <Select
+                                        value={mapping.source}
+                                        onValueChange={(value: VariableSource) => {
+                                          const newMappings = [...evolutionVariableMappings];
+                                          newMappings[index] = { ...mapping, source: value };
+                                          setEvolutionVariableMappings(newMappings);
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[140px] bg-card/50 border-yellow-500/30">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="name">Nome</SelectItem>
+                                          <SelectItem value="phone">Telefone</SelectItem>
+                                          <SelectItem value="email">E-mail</SelectItem>
+                                          <SelectItem value="custom">Texto fixo</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {mapping.source === 'custom' && (
+                                        <Input
+                                          placeholder="Valor fixo"
+                                          className="flex-1 bg-card/50 border-yellow-500/30"
+                                          value={mapping.customValue || ''}
+                                          onChange={(e) => {
+                                            const newMappings = [...evolutionVariableMappings];
+                                            newMappings[index] = { ...mapping, customValue: e.target.value };
+                                            setEvolutionVariableMappings(newMappings);
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
