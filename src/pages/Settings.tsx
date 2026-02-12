@@ -108,6 +108,7 @@ interface EvolutionTemplate {
   user_id: string;
   name: string;
   content: string;
+  poll_options: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -156,6 +157,7 @@ const Settings = () => {
   const [editingEvolutionTemplate, setEditingEvolutionTemplate] = useState<EvolutionTemplate | null>(null);
   const [evolutionTemplateName, setEvolutionTemplateName] = useState('');
   const [evolutionTemplateContent, setEvolutionTemplateContent] = useState('');
+  const [evolutionPollOptions, setEvolutionPollOptions] = useState<string[]>([]);
   const [isSavingEvolutionTemplate, setIsSavingEvolutionTemplate] = useState(false);
 
   // Meta template form state
@@ -509,6 +511,7 @@ const Settings = () => {
   const resetEvolutionTemplateForm = () => {
     setEvolutionTemplateName('');
     setEvolutionTemplateContent('');
+    setEvolutionPollOptions([]);
     setEditingEvolutionTemplate(null);
   };
 
@@ -517,6 +520,7 @@ const Settings = () => {
       setEditingEvolutionTemplate(template);
       setEvolutionTemplateName(template.name);
       setEvolutionTemplateContent(template.content);
+      setEvolutionPollOptions(template.poll_options || []);
     } else {
       resetEvolutionTemplateForm();
     }
@@ -531,10 +535,12 @@ const Settings = () => {
 
     setIsSavingEvolutionTemplate(true);
     try {
+      const cleanedOptions = evolutionPollOptions.map(o => o.trim()).filter(o => o.length > 0);
       const templateData = {
         user_id: user.id,
         name: evolutionTemplateName.trim(),
         content: evolutionTemplateContent.trim(),
+        poll_options: cleanedOptions.length > 0 ? cleanedOptions : null,
       };
 
       if (editingEvolutionTemplate) {
@@ -1231,6 +1237,46 @@ const Settings = () => {
                                 <p className="text-xs text-muted-foreground">
                                   Dica: Use {"{{1}}"}, {"{{2}}"}, etc. para inserir variáveis como nome do contato
                                 </p>
+                              </div>
+                              {/* Poll Options */}
+                              <div className="space-y-2">
+                                <Label>Opções de Enquete (opcional)</Label>
+                                <p className="text-xs text-muted-foreground">
+                                  Adicione opções numeradas para pesquisas. As respostas serão analisadas em gráficos na página de Resultados.
+                                </p>
+                                {evolutionPollOptions.map((option, index) => (
+                                  <div key={index} className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-muted-foreground w-6">{index + 1}.</span>
+                                    <Input
+                                      placeholder={`Opção ${index + 1}`}
+                                      value={option}
+                                      onChange={(e) => {
+                                        const updated = [...evolutionPollOptions];
+                                        updated[index] = e.target.value;
+                                        setEvolutionPollOptions(updated);
+                                      }}
+                                      className="flex-1"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={() => setEvolutionPollOptions(evolutionPollOptions.filter((_, i) => i !== index))}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEvolutionPollOptions([...evolutionPollOptions, ''])}
+                                >
+                                  <Plus className="h-4 w-4 mr-1" />
+                                  Adicionar Opção
+                                </Button>
                               </div>
                               <Button 
                                 onClick={handleSaveEvolutionTemplate} 
