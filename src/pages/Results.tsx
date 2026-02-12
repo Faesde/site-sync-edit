@@ -574,10 +574,21 @@ const Results = () => {
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      // Group results by contact_phone + campaign_id
+                      // Normalize Brazilian phone: strip non-digits, ensure 55+DDD+9+8digits
+                      const normalizePhone = (phone: string): string => {
+                        let d = phone.replace(/\D/g, '');
+                        if (!d.startsWith('55')) d = '55' + d;
+                        // If 12 digits (missing 9th digit), add it: 55 + DD + 9 + 8digits
+                        if (d.length === 12) {
+                          d = d.slice(0, 4) + '9' + d.slice(4);
+                        }
+                        return d;
+                      };
+
+                      // Group results by normalized phone + campaign_id
                       const grouped = new Map<string, CampaignResult[]>();
                       filteredResults.forEach((result) => {
-                        const key = `${result.contact_phone}::${result.campaign_id || 'none'}`;
+                        const key = `${normalizePhone(result.contact_phone)}::${result.campaign_id || 'none'}`;
                         if (!grouped.has(key)) grouped.set(key, []);
                         grouped.get(key)!.push(result);
                       });
