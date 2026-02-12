@@ -22,6 +22,8 @@ interface PollResultsModalProps {
   responses: Array<{
     message_content: string | null;
     status: string;
+    contact_phone: string;
+    created_at: string;
   }>;
 }
 
@@ -33,21 +35,27 @@ export const PollResultsModal: React.FC<PollResultsModalProps> = ({
   responses,
 }) => {
   const chartData = useMemo(() => {
-    // Only consider "received" responses
     const receivedResponses = responses.filter(r => r.status === "received" && r.message_content);
     
-    // Count responses matching each option number
-    const counts: Record<string, number> = {};
-    pollOptions.forEach((_, i) => {
-      counts[String(i + 1)] = 0;
+    const validOptions = new Set(pollOptions.map((_, i) => String(i + 1)));
+    
+    // Group by contact phone
+    const contactGroups = new Map<string, typeof receivedResponses>();
+    receivedResponses.forEach(r => {
+      const phone = r.contact_phone.replace(/\D/g, '');
+      if (!contactGroups.has(phone)) contactGroups.set(phone, []);
+      contactGroups.get(phone)!.push(r);
     });
+
+    const counts: Record<string, number> = {};
+    pollOptions.forEach((_, i) => { counts[String(i + 1)] = 0; });
     let otherCount = 0;
 
-    receivedResponses.forEach(r => {
-      const content = r.message_content?.trim() || "";
-      // Match if response is just the number
-      if (counts[content] !== undefined) {
-        counts[content]++;
+    contactGroups.forEach((messages) => {
+      messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const validMsg = messages.find(m => validOptions.has(m.message_content?.trim() || ""));
+      if (validMsg) {
+        counts[validMsg.message_content!.trim()]++;
       } else {
         otherCount++;
       }
@@ -69,7 +77,7 @@ export const PollResultsModal: React.FC<PollResultsModalProps> = ({
       });
     }
 
-    return { data, totalResponses: receivedResponses.length };
+    return { data, totalResponses: contactGroups.size };
   }, [pollOptions, responses]);
 
   const chartConfig = useMemo(() => {
