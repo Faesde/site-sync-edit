@@ -9,7 +9,8 @@ import {
   Loader2,
   Clock,
   MessageCircle,
-  ArrowRight
+  ArrowRight,
+  Pause
 } from "lucide-react";
 
 interface CampaignProgressModalProps {
@@ -19,6 +20,8 @@ interface CampaignProgressModalProps {
   failedCount: number;
   currentContact?: string;
   isComplete: boolean;
+  isPaused?: boolean;
+  pauseReason?: string | null;
   onContinueInBackground: () => void;
   onNewCampaign: () => void;
   onShowResults?: () => void;
@@ -32,6 +35,8 @@ export const CampaignProgressModal = ({
   failedCount,
   currentContact,
   isComplete,
+  isPaused = false,
+  pauseReason,
   onContinueInBackground,
   onNewCampaign,
   onShowResults,
@@ -117,8 +122,21 @@ export const CampaignProgressModal = ({
           </div>
         </div>
 
-        {/* Current Contact */}
-        {!isComplete && currentContact && (
+        {/* Current Contact / Pause Alert */}
+        {!isComplete && isPaused && pauseReason && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-6"
+          >
+            <Pause className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-yellow-500">Campanha Pausada</p>
+              <p className="text-xs text-muted-foreground">{pauseReason}</p>
+            </div>
+          </motion.div>
+        )}
+        {!isComplete && !isPaused && currentContact && (
           <motion.div
             key={currentContact}
             initial={{ opacity: 0, y: 10 }}
