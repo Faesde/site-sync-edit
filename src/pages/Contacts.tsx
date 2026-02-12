@@ -178,8 +178,9 @@ const Contacts = () => {
   // Campaign name modal
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   
-  // Send interval configuration (in seconds)
-  const [sendInterval, setSendInterval] = useState<number>(1);
+  // Send interval configuration (min/max for random delay)
+  const [sendIntervalMin, setSendIntervalMin] = useState<number>(25);
+  const [sendIntervalMax, setSendIntervalMax] = useState<number>(60);
   const [sendIntervalUnit, setSendIntervalUnit] = useState<'seconds' | 'minutes'>('seconds');
   
   // Campaign progress tracking
@@ -193,6 +194,9 @@ const Contacts = () => {
     campaignName: '',
   });
   const [isRunningInBackground, setIsRunningInBackground] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
   
   const extractTemplateVariables = (body: string): string[] => {
     const matches = body.match(/\{\{\d+\}\}/g) || [];
@@ -870,10 +874,31 @@ const Contacts = () => {
               return;
             }
 
-            // Calculate interval in milliseconds
-            const intervalMs = sendIntervalUnit === 'minutes' 
-              ? sendInterval * 60 * 1000 
-              : sendInterval * 1000;
+            // Calculate interval range in milliseconds
+            const multiplier = sendIntervalUnit === 'minutes' ? 60 * 1000 : 1000;
+            const intervalMinMs = sendIntervalMin * multiplier;
+            const intervalMaxMs = sendIntervalMax * multiplier;
+
+            // Helper: get random delay between min and max
+            const getRandomDelay = () => Math.floor(Math.random() * (intervalMaxMs - intervalMinMs + 1)) + intervalMinMs;
+
+            // Helper: check instance connection status
+            const checkConnection = async (): Promise<boolean> => {
+              try {
+                const statusResp = await supabase.functions.invoke('evolution-check-status', {
+                  headers: { Authorization: `Bearer ${session.access_token}` },
+                  body: { instance_id: selectedEvolutionInstanceId },
+                });
+                return statusResp.data?.status === 'connected';
+              } catch {
+                return false;
+              }
+            };
+
+            // Reset pause state
+            setIsPaused(false);
+            isPausedRef.current = false;
+            setPauseReason(null);
 
             // Initialize progress modal
             setCampaignProgress({
@@ -948,9 +973,63 @@ const Contacts = () => {
                 failedCount,
               }));
 
-              // Wait for interval before next message (except for last one)
+              // Wait for random interval before next message (except for last one)
               if (i < selectedContacts.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, intervalMs));
+                const delay = getRandomDelay();
+                await new Promise(resolve => setTimeout(resolve, delay));
+
+                // Check connection every 10 messages
+                if ((i + 1) % 10 === 0) {
+                  const isConnected = await checkConnection();
+                  if (!isConnected) {
+                    setIsPaused(true);
+                    isPausedRef.current = true;
+                    setPauseReason('Conexão com WhatsApp perdida. Aguardando reconexão...');
+                    setCampaignProgress(prev => ({
+                      ...prev,
+                      currentContact: '⚠️ Pausado - Aguardando reconexão...',
+                    }));
+
+                    // Wait and retry connection
+                    let reconnected = false;
+                    for (let retry = 0; retry < 60; retry++) { // try for 10 minutes
+                      await new Promise(resolve => setTimeout(resolve, 10000)); // 10s
+                      const ok = await checkConnection();
+                      if (ok) {
+                        reconnected = true;
+                        break;
+                      }
+                    }
+
+                    if (!reconnected) {
+                      // Save progress and stop
+                      setCampaignProgress(prev => ({
+                        ...prev,
+                        isComplete: true,
+                        currentContact: '',
+                      }));
+                      toast({
+                        title: "Campanha pausada",
+                        description: `Conexão não restaurada. ${sentCount} enviadas até agora.`,
+                        variant: "destructive",
+                      });
+                      // Update campaign stats with partial progress
+                      if (user) {
+                        await supabaseWiki
+                          .from('whatsapp_campaigns')
+                          .update({ sent_count: sentCount, failed_count: failedCount })
+                          .eq('id', unifiedCampaignId);
+                      }
+                      return;
+                    }
+
+                    // Resumed
+                    setIsPaused(false);
+                    isPausedRef.current = false;
+                    setPauseReason(null);
+                    toast({ title: "Reconectado!", description: "Continuando envio da campanha..." });
+                  }
+                }
               }
             }
 
@@ -1557,18 +1636,33 @@ const Contacts = () => {
                         <div className="flex items-center gap-2 mb-3">
                           <Timer className="w-5 h-5 text-accent-foreground" />
                           <h3 className="text-sm font-semibold text-accent-foreground">
-                            Intervalo entre Envios
+                            Intervalo entre Envios (Anti-Ban)
                           </h3>
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
-                            <Label className="text-xs text-muted-foreground mb-1 block">Intervalo</Label>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Mínimo</Label>
                             <Input
                               type="number"
                               min={1}
                               max={sendIntervalUnit === 'minutes' ? 60 : 300}
-                              value={sendInterval}
-                              onChange={(e) => setSendInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                              value={sendIntervalMin}
+                              onChange={(e) => {
+                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                setSendIntervalMin(val);
+                                if (val > sendIntervalMax) setSendIntervalMax(val);
+                              }}
+                              className="bg-card/50 border-accent/30"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Máximo</Label>
+                            <Input
+                              type="number"
+                              min={sendIntervalMin}
+                              max={sendIntervalUnit === 'minutes' ? 60 : 300}
+                              value={sendIntervalMax}
+                              onChange={(e) => setSendIntervalMax(Math.max(sendIntervalMin, parseInt(e.target.value) || sendIntervalMin))}
                               className="bg-card/50 border-accent/30"
                             />
                           </div>
@@ -1589,7 +1683,10 @@ const Contacts = () => {
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          💡 Cada mensagem será enviada a cada {sendInterval} {sendIntervalUnit === 'minutes' ? 'minuto(s)' : 'segundo(s)'}
+                          🛡️ Delay aleatório entre {sendIntervalMin} e {sendIntervalMax} {sendIntervalUnit === 'minutes' ? 'minuto(s)' : 'segundo(s)'} para evitar detecção
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ⚡ Verificação automática de conexão a cada 10 mensagens — pausa e retoma automaticamente
                         </p>
                       </div>
                     </motion.div>
@@ -2016,6 +2113,8 @@ const Contacts = () => {
           failedCount={campaignProgress.failedCount}
           currentContact={campaignProgress.currentContact}
           isComplete={campaignProgress.isComplete}
+          isPaused={isPaused}
+          pauseReason={pauseReason}
           campaignName={campaignProgress.campaignName}
           onContinueInBackground={() => {
             setIsRunningInBackground(true);
