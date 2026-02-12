@@ -902,10 +902,21 @@ const Contacts = () => {
               return Math.floor(Math.random() * (effectiveMaxMs - intervalMinMs + 1)) + intervalMinMs;
             };
 
+            // Helper: get current hour in Brasília timezone
+            const getBrasiliaHour = (): number => {
+              const now = new Date();
+              const brasiliaTime = new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                hour: 'numeric',
+                hour12: false,
+              }).format(now);
+              return parseInt(brasiliaTime, 10);
+            };
+
             // Helper: check if we're in night pause window
             const isNightTime = (): boolean => {
               if (!nightPauseEnabled) return false;
-              const hour = new Date().getHours();
+              const hour = getBrasiliaHour();
               if (nightPauseStart < nightPauseEnd) {
                 return hour >= nightPauseStart && hour < nightPauseEnd;
               }
