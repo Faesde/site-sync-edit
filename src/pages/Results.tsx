@@ -82,6 +82,7 @@ interface CampaignResult {
   call_status: string | null;
   status: string;
   created_at: string;
+  raw_payload: { provider?: string; instance?: string; message_id?: string } | null;
 }
 
 type ChannelFilter = 'all' | 'whatsapp' | 'call' | 'sms' | 'email';
@@ -635,10 +636,22 @@ const Results = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="secondary" className={`gap-1 ${channel?.color}`}>
-                                  <ChannelIcon className="h-3 w-3" />
-                                  {channel?.label}
-                                </Badge>
+                                {latest.channel_type === 'whatsapp' ? (
+                                  <div className="space-y-0.5">
+                                    <Badge variant="secondary" className={`gap-1 ${channel?.color}`}>
+                                      <ChannelIcon className="h-3 w-3" />
+                                      {latest.raw_payload?.provider === 'evolution' ? 'Evolution' : 'Meta API'}
+                                    </Badge>
+                                    {latest.raw_payload?.provider === 'evolution' && latest.raw_payload?.instance && (
+                                      <p className="text-xs text-muted-foreground">{latest.raw_payload.instance}</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Badge variant="secondary" className={`gap-1 ${channel?.color}`}>
+                                    <ChannelIcon className="h-3 w-3" />
+                                    {channel?.label}
+                                  </Badge>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <span className="text-sm text-muted-foreground">
