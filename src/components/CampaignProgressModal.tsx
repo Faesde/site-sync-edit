@@ -21,6 +21,7 @@ interface CampaignProgressModalProps {
   isComplete: boolean;
   onContinueInBackground: () => void;
   onNewCampaign: () => void;
+  onShowResults?: () => void;
   campaignName: string;
 }
 
@@ -33,6 +34,7 @@ export const CampaignProgressModal = ({
   isComplete,
   onContinueInBackground,
   onNewCampaign,
+  onShowResults,
   campaignName,
 }: CampaignProgressModalProps) => {
   const [showComplete, setShowComplete] = useState(false);
@@ -139,6 +141,12 @@ export const CampaignProgressModal = ({
                 <ArrowRight className="w-4 h-4 mr-2" />
                 Fazer Nova Campanha
               </Button>
+              {onShowResults && (
+                <Button variant="outline" onClick={onShowResults} className="w-full">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Mostrar Resultados
+                </Button>
+              )}
             </>
           ) : (
             <>
