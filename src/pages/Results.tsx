@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
@@ -106,6 +106,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.C
   ringing: { label: 'Chamando', color: 'bg-yellow-500/10 text-yellow-600', icon: Phone },
   busy: { label: 'Ocupado', color: 'bg-orange-500/10 text-orange-600', icon: Phone },
   'no-answer': { label: 'Sem resposta', color: 'bg-red-500/10 text-red-600', icon: XCircle },
+  received: { label: 'Respondido', color: 'bg-teal-500/10 text-teal-600', icon: MessageCircle },
 };
 
 const Results = () => {
@@ -572,104 +573,140 @@ const Results = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredResults.map((result) => {
-                      const channel = channelConfig[result.channel_type];
-                      const ChannelIcon = channel?.icon || MessageSquare;
-                      const status = statusConfig[result.status] || statusConfig.pending;
-                      const StatusIcon = status.icon;
-                      const isExpanded = expandedRows.has(result.id);
-                      const hasDetails = result.message_content || result.dtmf_response || result.dtmf_path;
-                      
-                      return (
-                        <>
-                          <TableRow 
-                            key={result.id}
-                            className={`cursor-pointer hover:bg-muted/50 ${isExpanded ? 'bg-muted/30' : ''}`}
-                            onClick={() => hasDetails && toggleRowExpand(result.id)}
-                          >
-                            <TableCell className="text-center">
-                              {hasDetails && (
-                                isExpanded 
-                                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{result.contact_name || result.contact_phone}</p>
-                                {result.contact_name && (
-                                  <p className="text-xs text-muted-foreground">{result.contact_phone}</p>
+                    {(() => {
+                      // Group results by contact_phone + campaign_id
+                      const grouped = new Map<string, CampaignResult[]>();
+                      filteredResults.forEach((result) => {
+                        const key = `${result.contact_phone}::${result.campaign_id || 'none'}`;
+                        if (!grouped.has(key)) grouped.set(key, []);
+                        grouped.get(key)!.push(result);
+                      });
+
+                      return Array.from(grouped.entries()).map(([groupKey, results]) => {
+                        // Sort: newest first
+                        results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                        const latest = results[0];
+                        const channel = channelConfig[latest.channel_type];
+                        const ChannelIcon = channel?.icon || MessageSquare;
+                        // Best status: received > read > delivered > sent > others
+                        const statusPriority: Record<string, number> = { received: 5, read: 4, delivered: 3, sent: 2 };
+                        const bestStatus = results.reduce((best, r) => 
+                          (statusPriority[r.status] || 0) > (statusPriority[best] || 0) ? r.status : best
+                        , results[0].status);
+                        const status = statusConfig[bestStatus] || statusConfig.pending;
+                        const StatusIcon = status.icon;
+                        const isExpanded = expandedRows.has(groupKey);
+                        const hasMultiple = results.length > 1;
+                        const hasDetails = results.some(r => r.message_content || r.dtmf_response || r.dtmf_path);
+
+                        return (
+                          <React.Fragment key={groupKey}>
+                            <TableRow
+                              className={`cursor-pointer hover:bg-muted/50 ${isExpanded ? 'bg-muted/30' : ''}`}
+                              onClick={() => (hasDetails || hasMultiple) && toggleRowExpand(groupKey)}
+                            >
+                              <TableCell className="text-center">
+                                {(hasDetails || hasMultiple) && (
+                                  isExpanded
+                                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                 )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={`gap-1 ${channel?.color}`}>
-                                <ChannelIcon className="h-3 w-3" />
-                                {channel?.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm text-muted-foreground">
-                                {result.campaign_name || '-'}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={`gap-1 ${status.color}`}>
-                                <StatusIcon className="h-3 w-3" />
-                                {status.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right text-sm text-muted-foreground">
-                              {format(new Date(result.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                            </TableCell>
-                          </TableRow>
-                          {isExpanded && hasDetails && (
-                            <TableRow key={`${result.id}-details`} className="bg-muted/20">
-                              <TableCell colSpan={6} className="p-4">
-                                <div className="space-y-2">
-                                  {result.channel_type === 'call' ? (
-                                    <>
-                                      {result.dtmf_response && (
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-muted-foreground">Resposta DTMF:</span>
-                                          <Badge variant="outline" className="font-mono">
-                                            {result.dtmf_response}
-                                          </Badge>
-                                          {result.call_duration && (
-                                            <span className="text-sm text-muted-foreground ml-4">
-                                              Duração: {Math.floor(result.call_duration / 60)}:{(result.call_duration % 60).toString().padStart(2, '0')}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {result.dtmf_path && result.dtmf_path.length > 0 && (
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-sm text-muted-foreground">Caminho:</span>
-                                          {result.dtmf_path.map((step, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs">
-                                              {step.key}: {step.label}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    result.message_content && (
-                                      <div>
-                                        <span className="text-sm text-muted-foreground">Mensagem:</span>
-                                        <p className="mt-1 text-sm p-3 bg-background rounded-lg border">
-                                          {result.message_content}
-                                        </p>
-                                      </div>
-                                    )
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{latest.contact_name || latest.contact_phone}</p>
+                                  {latest.contact_name && (
+                                    <p className="text-xs text-muted-foreground">{latest.contact_phone}</p>
+                                  )}
+                                  {hasMultiple && (
+                                    <p className="text-xs text-muted-foreground">{results.length} mensagens</p>
                                   )}
                                 </div>
                               </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className={`gap-1 ${channel?.color}`}>
+                                  <ChannelIcon className="h-3 w-3" />
+                                  {channel?.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm text-muted-foreground">
+                                  {latest.campaign_name || '-'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className={`gap-1 ${status.color}`}>
+                                  <StatusIcon className="h-3 w-3" />
+                                  {status.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-muted-foreground">
+                                {format(new Date(latest.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                              </TableCell>
                             </TableRow>
-                          )}
-                        </>
-                      );
-                    })}
+                            {isExpanded && (
+                              <TableRow key={`${groupKey}-details`} className="bg-muted/20">
+                                <TableCell colSpan={6} className="p-4">
+                                  <div className="space-y-3">
+                                    {results.map((r) => {
+                                      const rStatus = statusConfig[r.status] || statusConfig.pending;
+                                      const RStatusIcon = rStatus.icon;
+                                      return (
+                                        <div key={r.id} className="flex items-start gap-3 p-3 bg-background rounded-lg border">
+                                          <div className="flex-1 min-w-0">
+                                            {r.channel_type === 'call' ? (
+                                              <>
+                                                {r.dtmf_response && (
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-muted-foreground">DTMF:</span>
+                                                    <Badge variant="outline" className="font-mono">{r.dtmf_response}</Badge>
+                                                    {r.call_duration && (
+                                                      <span className="text-sm text-muted-foreground ml-2">
+                                                        {Math.floor(r.call_duration / 60)}:{(r.call_duration % 60).toString().padStart(2, '0')}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                )}
+                                                {r.dtmf_path && r.dtmf_path.length > 0 && (
+                                                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                                                    <span className="text-sm text-muted-foreground">Caminho:</span>
+                                                    {r.dtmf_path.map((step, idx) => (
+                                                      <Badge key={idx} variant="outline" className="text-xs">
+                                                        {step.key}: {step.label}
+                                                      </Badge>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </>
+                                            ) : (
+                                              r.message_content && (
+                                                <p className="text-sm">{r.message_content}</p>
+                                              )
+                                            )}
+                                            {!r.message_content && r.channel_type !== 'call' && (
+                                              <p className="text-sm text-muted-foreground italic">Sem conteúdo</p>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <Badge variant="secondary" className={`gap-1 text-xs ${rStatus.color}`}>
+                                              <RStatusIcon className="h-3 w-3" />
+                                              {rStatus.label}
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">
+                                              {format(new Date(r.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
                   </TableBody>
                 </Table>
               </ScrollArea>
