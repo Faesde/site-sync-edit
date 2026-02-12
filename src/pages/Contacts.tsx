@@ -207,6 +207,7 @@ const Contacts = () => {
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   const [pauseReason, setPauseReason] = useState<string | null>(null);
+  const cancelCampaignRef = useRef(false);
   
   const extractTemplateVariables = (body: string): string[] => {
     const matches = body.match(/\{\{\d+\}\}/g) || [];
@@ -953,10 +954,11 @@ const Contacts = () => {
               }
             };
 
-            // Reset pause state
+            // Reset pause and cancel state
             setIsPaused(false);
             isPausedRef.current = false;
             setPauseReason(null);
+            cancelCampaignRef.current = false;
 
             // Initialize progress modal
             setCampaignProgress({
@@ -975,6 +977,20 @@ const Contacts = () => {
             let failedCount = 0;
 
             for (let i = 0; i < selectedContacts.length; i++) {
+              // Check if campaign was cancelled
+              if (cancelCampaignRef.current) {
+                toast({
+                  title: "Campanha cancelada",
+                  description: `${sentCount} enviadas, ${failedCount} falhas antes do cancelamento.`,
+                  variant: "destructive",
+                });
+                setCampaignProgress(prev => ({ ...prev, isComplete: true, currentContact: '' }));
+                if (user) {
+                  await supabaseWiki.from('whatsapp_campaigns').update({ sent_count: sentCount, failed_count: failedCount }).eq('id', unifiedCampaignId);
+                }
+                return;
+              }
+
               const contact = selectedContacts[i];
               
               // Update current contact
@@ -2304,6 +2320,9 @@ const Contacts = () => {
           onShowResults={() => {
             setShowProgressModal(false);
             navigate('/results');
+          }}
+          onCancel={() => {
+            cancelCampaignRef.current = true;
           }}
         />
       </main>
