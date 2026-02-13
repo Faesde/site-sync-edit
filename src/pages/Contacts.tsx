@@ -160,7 +160,7 @@ const Contacts = () => {
   }
   const [evolutionInstances, setEvolutionInstances] = useState<EvolutionInstance[]>([]);
   const [evolutionTemplates, setEvolutionTemplates] = useState<EvolutionTemplate[]>([]);
-  const [selectedEvolutionInstanceId, setSelectedEvolutionInstanceId] = useState<string | null>(null);
+  const [selectedEvolutionInstanceIds, setSelectedEvolutionInstanceIds] = useState<string[]>([]);
   const [selectedEvolutionTemplateId, setSelectedEvolutionTemplateId] = useState<string | null>(null);
   const [evolutionCustomMessage, setEvolutionCustomMessage] = useState('');
   const [evolutionMessageMode, setEvolutionMessageMode] = useState<'template' | 'custom'>('template');
@@ -330,8 +330,8 @@ const Contacts = () => {
               );
               setEvolutionInstances(connectedInstances);
               // Auto-select first connected instance
-              if (connectedInstances.length > 0 && !selectedEvolutionInstanceId) {
-                setSelectedEvolutionInstanceId(connectedInstances[0].id);
+              if (connectedInstances.length > 0 && selectedEvolutionInstanceIds.length === 0) {
+                setSelectedEvolutionInstanceIds([connectedInstances[0].id]);
               }
             }
             
@@ -876,8 +876,8 @@ const Contacts = () => {
               toast({ title: "Erro", description: "Nenhuma mensagem definida.", variant: "destructive" });
               return;
             }
-            if (!selectedEvolutionInstanceId) {
-              toast({ title: "Erro", description: "Selecione uma instância do WhatsApp.", variant: "destructive" });
+            if (selectedEvolutionInstanceIds.length === 0) {
+              toast({ title: "Erro", description: "Selecione pelo menos uma instância do WhatsApp.", variant: "destructive" });
               return;
             }
 
@@ -905,7 +905,7 @@ const Contacts = () => {
                 action: 'start',
                 campaign_id: unifiedCampaignId,
                 campaign_name: campaignName,
-                instance_id: selectedEvolutionInstanceId,
+                instance_ids: selectedEvolutionInstanceIds,
                 contacts: selectedContacts.map(c => ({ name: c.name, phone: c.phone, email: c.email })),
                 message_body: messageBody,
                 template_id: selectedEvolutionTemplateId,
@@ -1372,24 +1372,40 @@ const Contacts = () => {
                         ) : (
                           <div className="space-y-4">
                             {/* Instance Selection */}
-                            <div>
-                              <Label className="text-xs text-green-300 mb-2 block">Enviar de:</Label>
-                              <Select 
-                                value={selectedEvolutionInstanceId || ''} 
-                                onValueChange={setSelectedEvolutionInstanceId}
-                              >
-                                <SelectTrigger className="bg-green-500/10 border-green-500/30 text-green-300">
-                                  <SelectValue placeholder="Selecione uma instância" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {evolutionInstances.map((instance) => (
-                                    <SelectItem key={instance.id} value={instance.id}>
-                                      {instance.display_name || instance.instance_name}
-                                      {instance.phone_number && ` (${instance.phone_number})`}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                             <div>
+                              <Label className="text-xs text-green-300 mb-2 block">
+                                Enviar de: {selectedEvolutionInstanceIds.length > 1 && `(${selectedEvolutionInstanceIds.length} números — intercalar)`}
+                              </Label>
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {evolutionInstances.map((instance) => {
+                                  const isChecked = selectedEvolutionInstanceIds.includes(instance.id);
+                                  return (
+                                    <label
+                                      key={instance.id}
+                                      className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                        isChecked
+                                          ? 'bg-green-500/20 border-green-500/50'
+                                          : 'bg-card/30 border-border/50 hover:border-green-500/30'
+                                      }`}
+                                    >
+                                      <Checkbox
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedEvolutionInstanceIds(prev =>
+                                            checked
+                                              ? [...prev, instance.id]
+                                              : prev.filter(id => id !== instance.id)
+                                          );
+                                        }}
+                                      />
+                                      <span className="text-sm text-green-300">
+                                        {instance.display_name || instance.instance_name}
+                                        {instance.phone_number && ` (${instance.phone_number})`}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             {/* Message Mode Toggle */}

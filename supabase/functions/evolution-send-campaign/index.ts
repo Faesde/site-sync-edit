@@ -99,12 +99,21 @@ serve(async (req) => {
       }
 
       const {
-        campaign_id, campaign_name, instance_id, contacts, message_body,
+        campaign_id, campaign_name, instance_id, instance_ids, contacts, message_body,
         template_id, variable_mappings,
         delay_min_ms, delay_max_ms,
         warmup_enabled, warmup_messages, warmup_max_delay_ms,
         night_pause_enabled, night_pause_start, night_pause_end,
       } = body;
+
+      // Support both single instance_id and array instance_ids
+      const resolvedInstanceIds: string[] = Array.isArray(instance_ids) && instance_ids.length > 0
+        ? instance_ids
+        : instance_id ? [instance_id] : [];
+
+      if (resolvedInstanceIds.length === 0) {
+        return new Response(JSON.stringify({ error: "Nenhuma instância selecionada" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       const { data: job, error: jobErr } = await supabase.from("campaign_jobs").insert({
         user_id: userRes.user.id,
@@ -116,7 +125,7 @@ serve(async (req) => {
         sent_count: 0,
         failed_count: 0,
         config: {
-          instance_id,
+          instance_ids: resolvedInstanceIds,
           message_body,
           template_id: template_id || null,
           variable_mappings: variable_mappings || [],
@@ -159,7 +168,16 @@ serve(async (req) => {
 
       const config = job.config;
       const contacts = config.contacts;
-      const instanceId = config.instance_id;
+      
+      // Support both legacy single instance_id and new instance_ids array
+      const instanceIds: string[] = Array.isArray(config.instance_ids) && config.instance_ids.length > 0
+        ? config.instance_ids
+        : config.instance_id ? [config.instance_id] : [];
+
+      if (instanceIds.length === 0) {
+        await supabase.from("campaign_jobs").update({ status: "failed", current_contact: "Nenhuma instância configurada", updated_at: new Date().toISOString() }).eq("id", job_id);
+        return new Response(JSON.stringify({ error: "No instances" }), { status: 400, headers: corsHeaders });
+      }
 
       // ── Night pause: don't block, just mark paused and schedule re-invoke ──
       if (config.night_pause_enabled && isNightTime(config.night_pause_start, config.night_pause_end)) {
@@ -168,8 +186,6 @@ serve(async (req) => {
           current_contact: `⏸ Pausa noturna (${config.night_pause_start}h-${config.night_pause_end}h)`,
           updated_at: new Date().toISOString(),
         }).eq("id", job_id);
-
-        // pg_cron will re-invoke this job every 2 minutes
         return new Response(JSON.stringify({ success: true, status: "paused_night" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -178,15 +194,17 @@ serve(async (req) => {
         await supabase.from("campaign_jobs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", job_id);
       }
 
-      // Fetch instance
-      const { data: instance } = await supabase.from("evolution_instances").select("*").eq("id", instanceId).single();
-      if (!instance || instance.status !== "connected") {
+      // Fetch all instances and filter connected ones
+      const { data: allInstances } = await supabase.from("evolution_instances").select("*").in("id", instanceIds);
+      const connectedInstances = (allInstances || []).filter((inst: any) => inst.status === "connected");
+
+      if (connectedInstances.length === 0) {
         await supabase.from("campaign_jobs").update({
           status: "failed",
-          current_contact: "Instância desconectada",
+          current_contact: "Todas as instâncias desconectadas",
           updated_at: new Date().toISOString(),
         }).eq("id", job_id);
-        return new Response(JSON.stringify({ error: "Instance disconnected" }), { status: 400, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "All instances disconnected" }), { status: 400, headers: corsHeaders });
       }
 
       let offset = job.processed_offset;
@@ -235,25 +253,29 @@ serve(async (req) => {
             return new Response(JSON.stringify({ success: true, status: "cancelled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
 
-          // ── Connection check: don't block with retries, just pause and re-invoke later ──
+          // ── Connection check on current round-robin instance ──
+          const currentInstance = connectedInstances[i % connectedInstances.length];
           try {
             const statusResp = await fetch(
-              `${Deno.env.get("EVOLUTION_API_URL")}/instance/connectionState/${instance.instance_name}`,
+              `${Deno.env.get("EVOLUTION_API_URL")}/instance/connectionState/${currentInstance.instance_name}`,
               { headers: { apikey: Deno.env.get("EVOLUTION_API_KEY")! } }
             );
             const statusData = await statusResp.json();
             if (statusData?.instance?.state !== "open") {
-              await supabase.from("campaign_jobs").update({
-                status: "paused",
-                current_contact: "⚠️ Aguardando reconexão...",
-                processed_offset: i,
-                sent_count: sentCount,
-                failed_count: failedCount,
-                updated_at: new Date().toISOString(),
-              }).eq("id", job_id);
-
-              // pg_cron will re-invoke this job every 2 minutes
-              return new Response(JSON.stringify({ success: true, status: "paused_disconnected" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+              // Remove disconnected instance from rotation
+              const idx = connectedInstances.findIndex((inst: any) => inst.id === currentInstance.id);
+              if (idx !== -1) connectedInstances.splice(idx, 1);
+              if (connectedInstances.length === 0) {
+                await supabase.from("campaign_jobs").update({
+                  status: "paused",
+                  current_contact: "⚠️ Aguardando reconexão...",
+                  processed_offset: i,
+                  sent_count: sentCount,
+                  failed_count: failedCount,
+                  updated_at: new Date().toISOString(),
+                }).eq("id", job_id);
+                return new Response(JSON.stringify({ success: true, status: "paused_disconnected" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+              }
             }
           } catch {}
 
@@ -297,10 +319,13 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq("id", job_id);
 
+        // Round-robin: pick instance based on message index
+        const activeInstance = connectedInstances[i % connectedInstances.length];
+
         // Send message
         try {
           const res = await fetch(
-            `${Deno.env.get("EVOLUTION_API_URL")}/message/sendText/${instance.instance_name}`,
+            `${Deno.env.get("EVOLUTION_API_URL")}/message/sendText/${activeInstance.instance_name}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json", apikey: Deno.env.get("EVOLUTION_API_KEY")! },
@@ -325,7 +350,7 @@ serve(async (req) => {
             status,
             raw_payload: {
               provider: "evolution",
-              instance: instance.instance_name,
+              instance: activeInstance.instance_name,
               message_id: data.key?.id || null,
               error: !res.ok ? data : null,
             },
