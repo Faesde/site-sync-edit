@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -122,6 +123,8 @@ const Results = () => {
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showPollChart, setShowPollChart] = useState(false);
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -298,6 +301,60 @@ const Results = () => {
     setDeleteDialogOpen(true);
   };
 
+  const toggleCampaignSelection = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedCampaigns(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCampaigns.size === campaigns.length) {
+      setSelectedCampaigns(new Set());
+    } else {
+      setSelectedCampaigns(new Set(campaigns.map(c => c.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCampaigns.size === 0 || !user) return;
+    setDeleting(true);
+    try {
+      const { data: sessionRes, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) throw sessionErr;
+      const session = sessionRes.session;
+      if (!session) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const ids = Array.from(selectedCampaigns);
+      const { data, error } = await supabase.functions.invoke("delete-campaign", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { campaign_ids: ids },
+      });
+
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Erro ao excluir");
+
+      setCampaigns(prev => prev.filter(c => !selectedCampaigns.has(c.id)));
+      setCampaignResults(prev => prev.filter(r => !r.campaign_id || !selectedCampaigns.has(r.campaign_id)));
+      if (activeCampaignId && selectedCampaigns.has(activeCampaignId)) setActiveCampaignId(null);
+
+      toast({
+        title: "Campanhas excluídas",
+        description: `${ids.length} campanha(s) excluída(s) com sucesso.`,
+      });
+      setSelectedCampaigns(new Set());
+    } catch (error: any) {
+      console.error("Bulk delete error:", error);
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+      setBulkDeleteDialogOpen(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -369,16 +426,47 @@ const Results = () => {
               </Card>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Selecione uma campanha para ver os resultados ({campaigns.length} campanha{campaigns.length !== 1 ? 's' : ''})
-                </p>
+                {/* Selection toolbar */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={toggleSelectAll}
+                    >
+                      <Checkbox
+                        checked={selectedCampaigns.size === campaigns.length && campaigns.length > 0}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                      {selectedCampaigns.size === campaigns.length ? 'Limpar seleção' : 'Selecionar tudo'}
+                    </button>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedCampaigns.size > 0
+                        ? `${selectedCampaigns.size} selecionada(s)`
+                        : `${campaigns.length} campanha${campaigns.length !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                  {selectedCampaigns.size > 0 && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setBulkDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir {selectedCampaigns.size}
+                    </Button>
+                  )}
+                </div>
+
                 {campaigns.map((campaign) => {
                   const campaignResultsCount = campaignResults.filter(r => r.campaign_id === campaign.id).length;
                   const receivedCount = campaignResults.filter(r => r.campaign_id === campaign.id && r.status === 'received').length;
+                  const isSelected = selectedCampaigns.has(campaign.id);
                   return (
                     <Card 
                       key={campaign.id}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''}`}
                       onClick={() => {
                         setActiveCampaignId(campaign.id);
                         setExpandedRows(new Set());
@@ -389,23 +477,28 @@ const Results = () => {
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium truncate">{campaign.name}</p>
-                              {campaign.poll_options && campaign.poll_options.length > 0 && (
-                                <Badge variant="secondary" className="gap-1 shrink-0">
-                                  <BarChart3 className="h-3 w-3" />
-                                  Enquete
-                                </Badge>
-                              )}
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div onClick={(e) => toggleCampaignSelection(campaign.id, e)}>
+                              <Checkbox checked={isSelected} />
                             </div>
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(campaign.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                              </span>
-                              {campaign.template_name && (
-                                <span className="text-xs text-muted-foreground">• {campaign.template_name}</span>
-                              )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium truncate">{campaign.name}</p>
+                                {campaign.poll_options && campaign.poll_options.length > 0 && (
+                                  <Badge variant="secondary" className="gap-1 shrink-0">
+                                    <BarChart3 className="h-3 w-3" />
+                                    Enquete
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(campaign.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                </span>
+                                {campaign.template_name && (
+                                  <span className="text-xs text-muted-foreground">• {campaign.template_name}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
@@ -795,6 +888,39 @@ const Results = () => {
                   </>
                 ) : (
                   'Excluir'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir {selectedCampaigns.size} campanha(s)</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir {selectedCampaigns.size} campanha(s) selecionada(s)?
+                <br />
+                <span className="text-destructive font-medium">
+                  Todos os resultados associados também serão excluídos permanentemente.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkDelete}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  `Excluir ${selectedCampaigns.size}`
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

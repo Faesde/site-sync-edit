@@ -33,26 +33,34 @@ serve(async (req) => {
     }
 
     const user = userRes.user;
-    const { campaign_id } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    
+    // Support both single campaign_id and batch campaign_ids
+    let ids: string[] = [];
+    if (Array.isArray(body.campaign_ids) && body.campaign_ids.length > 0) {
+      ids = body.campaign_ids.filter((id: any) => typeof id === 'string');
+    } else if (typeof body.campaign_id === 'string') {
+      ids = [body.campaign_id];
+    }
 
-    if (!campaign_id || typeof campaign_id !== "string") {
-      return new Response(JSON.stringify({ success: false, error: "campaign_id é obrigatório" }), {
+    if (ids.length === 0) {
+      return new Response(JSON.stringify({ success: false, error: "campaign_id ou campaign_ids é obrigatório" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Confirma ownership
-    const { data: campaign, error: campaignFetchErr } = await supabase
+    // Confirma ownership de todas
+    const { data: ownedCampaigns, error: campaignFetchErr } = await supabase
       .from("whatsapp_campaigns")
       .select("id")
-      .eq("id", campaign_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .in("id", ids)
+      .eq("user_id", user.id);
 
     if (campaignFetchErr) throw campaignFetchErr;
-    if (!campaign) {
-      return new Response(JSON.stringify({ success: false, error: "Campanha não encontrada" }), {
+    const ownedIds = (ownedCampaigns || []).map((c: any) => c.id);
+    if (ownedIds.length === 0) {
+      return new Response(JSON.stringify({ success: false, error: "Nenhuma campanha encontrada" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -63,16 +71,16 @@ serve(async (req) => {
       .from("campaign_results")
       .delete()
       .eq("user_id", user.id)
-      .eq("campaign_id", campaign_id);
+      .in("campaign_id", ownedIds);
 
     if (resultsErr) throw resultsErr;
 
-    // Apaga a campanha
+    // Apaga as campanhas
     const { error: deleteCampaignErr } = await supabase
       .from("whatsapp_campaigns")
       .delete()
       .eq("user_id", user.id)
-      .eq("id", campaign_id);
+      .in("id", ownedIds);
 
     if (deleteCampaignErr) throw deleteCampaignErr;
 
