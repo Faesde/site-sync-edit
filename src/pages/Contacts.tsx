@@ -1556,27 +1556,49 @@ const Contacts = () => {
                           <div className="flex-1">
                             <Label className="text-xs text-muted-foreground mb-1 block">Mínimo</Label>
                             <Input
-                              type="number"
-                              min={1}
-                              max={sendIntervalUnit === 'minutes' ? 60 : 300}
-                              value={sendIntervalMin}
+                              type="text"
+                              inputMode="numeric"
+                              value={sendIntervalMin === 0 ? '' : sendIntervalMin}
                               onChange={(e) => {
-                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                const raw = e.target.value.replace(/\D/g, '');
+                                if (raw === '') {
+                                  setSendIntervalMin(0);
+                                  return;
+                                }
+                                const val = parseInt(raw, 10);
                                 setSendIntervalMin(val);
                                 if (val > sendIntervalMax) setSendIntervalMax(val);
                               }}
-                              className="bg-card/50 border-accent/30"
+                              onBlur={() => {
+                                const minAllowed = sendIntervalUnit === 'seconds' ? 5 : 1;
+                                if (sendIntervalMin < minAllowed) setSendIntervalMin(minAllowed);
+                              }}
+                              className={`bg-card/50 border-accent/30 ${sendIntervalMin > 0 && sendIntervalMin < (sendIntervalUnit === 'seconds' ? 5 : 1) ? 'border-red-500' : ''}`}
                             />
+                            {sendIntervalMin > 0 && sendIntervalMin < (sendIntervalUnit === 'seconds' ? 5 : 1) && (
+                              <p className="text-xs text-red-400 mt-1">Mínimo de {sendIntervalUnit === 'seconds' ? '5 segundos' : '1 minuto'}</p>
+                            )}
                           </div>
                           <div className="flex-1">
                             <Label className="text-xs text-muted-foreground mb-1 block">Máximo</Label>
                             <Input
-                              type="number"
-                              min={sendIntervalMin}
-                              max={sendIntervalUnit === 'minutes' ? 60 : 300}
-                              value={sendIntervalMax}
-                              onChange={(e) => setSendIntervalMax(Math.max(sendIntervalMin, parseInt(e.target.value) || sendIntervalMin))}
-                              className="bg-card/50 border-accent/30"
+                              type="text"
+                              inputMode="numeric"
+                              value={sendIntervalMax === 0 ? '' : sendIntervalMax}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '');
+                                if (raw === '') {
+                                  setSendIntervalMax(0);
+                                  return;
+                                }
+                                setSendIntervalMax(parseInt(raw, 10));
+                              }}
+                              onBlur={() => {
+                                const minAllowed = sendIntervalUnit === 'seconds' ? 5 : 1;
+                                const effectiveMin = Math.max(sendIntervalMin, minAllowed);
+                                if (sendIntervalMax < effectiveMin) setSendIntervalMax(effectiveMin);
+                              }}
+                              className={`bg-card/50 border-accent/30 ${sendIntervalMax > 0 && sendIntervalMax < sendIntervalMin ? 'border-red-500' : ''}`}
                             />
                           </div>
                           <div className="flex-1">
