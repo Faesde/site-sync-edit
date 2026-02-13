@@ -365,9 +365,9 @@ const Results = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container mx-auto px-4 py-20">
+        <main className="container mx-auto px-4 py-20 flex-1">
           <Card className="max-w-md mx-auto">
             <CardContent className="p-6 text-center">
               <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
