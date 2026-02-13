@@ -44,6 +44,30 @@ function getRandomDelay(
   return Math.floor(Math.random() * (effectiveMaxMs - intervalMinMs + 1)) + intervalMinMs;
 }
 
+/** Fire-and-forget self-invoke with retry */
+function selfInvoke(supabaseUrl: string, serviceKey: string, jobId: string, delayMs = 0) {
+  const fnUrl = `${supabaseUrl}/functions/v1/evolution-send-campaign`;
+  const doInvoke = () => {
+    fetch(fnUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+      body: JSON.stringify({ action: "process", job_id: jobId }),
+    }).catch((e) => {
+      console.error("Self-invoke failed, retrying in 5s:", e);
+      setTimeout(() => {
+        fetch(fnUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          body: JSON.stringify({ action: "process", job_id: jobId }),
+        }).catch((e2) => console.error("Self-invoke retry also failed:", e2));
+      }, 5000);
+    });
+  };
+
+  if (delayMs > 0) setTimeout(doInvoke, delayMs);
+  else doInvoke();
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -82,7 +106,6 @@ serve(async (req) => {
         night_pause_enabled, night_pause_start, night_pause_end,
       } = body;
 
-      // Create job row
       const { data: job, error: jobErr } = await supabase.from("campaign_jobs").insert({
         user_id: userRes.user.id,
         campaign_id,
@@ -111,26 +134,19 @@ serve(async (req) => {
 
       if (jobErr) throw jobErr;
 
-      // Self-invoke to start processing (non-blocking)
-      const fnUrl = `${supabaseUrl}/functions/v1/evolution-send-campaign`;
-      fetch(fnUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ action: "process", job_id: job.id }),
-      }).catch((e) => console.error("Self-invoke error:", e));
+      selfInvoke(supabaseUrl, serviceKey, job.id);
 
       return new Response(JSON.stringify({ success: true, job_id: job.id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ─── PROCESS (internal, called by self-invoke) ───
+    // ─── PROCESS ───
     if (action === "process") {
       const { job_id } = body;
       const startTime = Date.now();
-      const MAX_RUNTIME_MS = 50000; // 50s budget to stay under 60s timeout
+      const MAX_RUNTIME_MS = 45000; // 45s safe budget
 
-      // Fetch job
       const { data: job, error: fetchErr } = await supabase.from("campaign_jobs").select("*").eq("id", job_id).single();
       if (fetchErr || !job) {
         console.error("Job not found:", job_id);
@@ -144,6 +160,24 @@ serve(async (req) => {
       const config = job.config;
       const contacts = config.contacts;
       const instanceId = config.instance_id;
+
+      // ── Night pause: don't block, just mark paused and schedule re-invoke ──
+      if (config.night_pause_enabled && isNightTime(config.night_pause_start, config.night_pause_end)) {
+        await supabase.from("campaign_jobs").update({
+          status: "paused",
+          current_contact: `⏸ Pausa noturna (${config.night_pause_start}h-${config.night_pause_end}h)`,
+          updated_at: new Date().toISOString(),
+        }).eq("id", job_id);
+
+        // Re-invoke in 5 minutes to check again (non-blocking)
+        selfInvoke(supabaseUrl, serviceKey, job_id, 300_000);
+        return new Response(JSON.stringify({ success: true, status: "paused_night" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // If was paused, resume
+      if (job.status === "paused") {
+        await supabase.from("campaign_jobs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", job_id);
+      }
 
       // Fetch instance
       const { data: instance } = await supabase.from("evolution_instances").select("*").eq("id", instanceId).single();
@@ -160,10 +194,18 @@ serve(async (req) => {
       let sentCount = job.sent_count;
       let failedCount = job.failed_count;
 
+      // Batch results for bulk insert
+      const resultsBatch: any[] = [];
+
       for (let i = offset; i < contacts.length; i++) {
-        // Check time budget
+        // ── Time budget check ──
         if (Date.now() - startTime > MAX_RUNTIME_MS) {
-          // Save progress and self-invoke to continue
+          // Flush pending results
+          if (resultsBatch.length > 0) {
+            await supabase.from("campaign_results").insert(resultsBatch);
+            resultsBatch.length = 0;
+          }
+
           await supabase.from("campaign_jobs").update({
             processed_offset: i,
             sent_count: sentCount,
@@ -172,38 +214,29 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           }).eq("id", job_id);
 
-          const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/evolution-send-campaign`;
-          fetch(fnUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-            body: JSON.stringify({ action: "process", job_id }),
-          }).catch((e) => console.error("Self-invoke error:", e));
-
+          selfInvoke(supabaseUrl, serviceKey, job_id);
           return new Response(JSON.stringify({ success: true, continuing: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // Re-check job status for cancellation (every 10 messages)
+        // ── Every 10 messages: check cancellation + connection ──
         if (i > offset && i % 10 === 0) {
+          // Flush batch every 10 messages
+          if (resultsBatch.length > 0) {
+            await supabase.from("campaign_results").insert(resultsBatch);
+            resultsBatch.length = 0;
+          }
+
           const { data: checkJob } = await supabase.from("campaign_jobs").select("status").eq("id", job_id).single();
           if (checkJob?.status === "cancelled") {
             await supabase.from("campaign_jobs").update({
-              processed_offset: i,
-              sent_count: sentCount,
-              failed_count: failedCount,
-              current_contact: "",
-              updated_at: new Date().toISOString(),
+              processed_offset: i, sent_count: sentCount, failed_count: failedCount,
+              current_contact: "", updated_at: new Date().toISOString(),
             }).eq("id", job_id);
-
-            // Update campaign stats
-            await supabase.from("whatsapp_campaigns").update({
-              sent_count: sentCount,
-              failed_count: failedCount,
-            }).eq("id", job.campaign_id);
-
+            await supabase.from("whatsapp_campaigns").update({ sent_count: sentCount, failed_count: failedCount }).eq("id", job.campaign_id);
             return new Response(JSON.stringify({ success: true, status: "cancelled" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
 
-          // Check connection
+          // ── Connection check: don't block with retries, just pause and re-invoke later ──
           try {
             const statusResp = await fetch(
               `${Deno.env.get("EVOLUTION_API_URL")}/instance/connectionState/${instance.instance_name}`,
@@ -211,64 +244,34 @@ serve(async (req) => {
             );
             const statusData = await statusResp.json();
             if (statusData?.instance?.state !== "open") {
-              // Pause and wait for reconnection
               await supabase.from("campaign_jobs").update({
                 status: "paused",
                 current_contact: "⚠️ Aguardando reconexão...",
+                processed_offset: i,
+                sent_count: sentCount,
+                failed_count: failedCount,
                 updated_at: new Date().toISOString(),
               }).eq("id", job_id);
 
-              let reconnected = false;
-              for (let retry = 0; retry < 30; retry++) {
-                await new Promise((r) => setTimeout(r, 10000));
-                try {
-                  const retryResp = await fetch(
-                    `${Deno.env.get("EVOLUTION_API_URL")}/instance/connectionState/${instance.instance_name}`,
-                    { headers: { apikey: Deno.env.get("EVOLUTION_API_KEY")! } }
-                  );
-                  const retryData = await retryResp.json();
-                  if (retryData?.instance?.state === "open") {
-                    reconnected = true;
-                    break;
-                  }
-                } catch {}
-              }
-
-              if (!reconnected) {
-                await supabase.from("campaign_jobs").update({
-                  status: "failed",
-                  current_contact: "Conexão perdida",
-                  processed_offset: i,
-                  sent_count: sentCount,
-                  failed_count: failedCount,
-                  updated_at: new Date().toISOString(),
-                }).eq("id", job_id);
-                await supabase.from("whatsapp_campaigns").update({ sent_count: sentCount, failed_count: failedCount }).eq("id", job.campaign_id);
-                return new Response(JSON.stringify({ error: "Connection lost" }), { status: 500, headers: corsHeaders });
-              }
-
-              await supabase.from("campaign_jobs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", job_id);
+              // Re-invoke in 30s to check if reconnected
+              selfInvoke(supabaseUrl, serviceKey, job_id, 30_000);
+              return new Response(JSON.stringify({ success: true, status: "paused_disconnected" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           } catch {}
-        }
 
-        // Night pause check
-        if (config.night_pause_enabled && isNightTime(config.night_pause_start, config.night_pause_end)) {
-          await supabase.from("campaign_jobs").update({
-            status: "paused",
-            current_contact: `Pausa noturna (${config.night_pause_start}h-${config.night_pause_end}h)`,
-            processed_offset: i,
-            sent_count: sentCount,
-            failed_count: failedCount,
-            updated_at: new Date().toISOString(),
-          }).eq("id", job_id);
-
-          // Wait until night ends (check every 60s)
-          while (isNightTime(config.night_pause_start, config.night_pause_end)) {
-            await new Promise((r) => setTimeout(r, 60000));
+          // ── Night pause mid-loop check ──
+          if (config.night_pause_enabled && isNightTime(config.night_pause_start, config.night_pause_end)) {
+            await supabase.from("campaign_jobs").update({
+              status: "paused",
+              current_contact: `⏸ Pausa noturna (${config.night_pause_start}h-${config.night_pause_end}h)`,
+              processed_offset: i,
+              sent_count: sentCount,
+              failed_count: failedCount,
+              updated_at: new Date().toISOString(),
+            }).eq("id", job_id);
+            selfInvoke(supabaseUrl, serviceKey, job_id, 300_000);
+            return new Response(JSON.stringify({ success: true, status: "paused_night" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
-
-          await supabase.from("campaign_jobs").update({ status: "running", updated_at: new Date().toISOString() }).eq("id", job_id);
         }
 
         const contact = contacts[i];
@@ -287,9 +290,12 @@ serve(async (req) => {
           resolvedMessage = resolvedMessage.split(mapping.variable).join(value);
         }
 
-        // Update current contact
+        // Update progress (combined: current_contact + counts, every message)
         await supabase.from("campaign_jobs").update({
           current_contact: contact.name || contact.phone,
+          processed_offset: i,
+          sent_count: sentCount,
+          failed_count: failedCount,
           updated_at: new Date().toISOString(),
         }).eq("id", job_id);
 
@@ -309,8 +315,8 @@ serve(async (req) => {
           if (res.ok) sentCount++;
           else failedCount++;
 
-          // Record result
-          await supabase.from("campaign_results").insert({
+          // Queue result for batch insert
+          resultsBatch.push({
             user_id: job.user_id,
             campaign_id: job.campaign_id,
             campaign_name: job.campaign_name || null,
@@ -332,26 +338,19 @@ serve(async (req) => {
           failedCount++;
         }
 
-        // Update progress
-        await supabase.from("campaign_jobs").update({
-          processed_offset: i + 1,
-          sent_count: sentCount,
-          failed_count: failedCount,
-          updated_at: new Date().toISOString(),
-        }).eq("id", job_id);
-
         // Delay before next message
         if (i < contacts.length - 1) {
           const delay = getRandomDelay(
-            i,
-            config.delay_min_ms,
-            config.delay_max_ms,
-            config.warmup_enabled,
-            config.warmup_messages,
-            config.warmup_max_delay_ms
+            i, config.delay_min_ms, config.delay_max_ms,
+            config.warmup_enabled, config.warmup_messages, config.warmup_max_delay_ms
           );
           await new Promise((r) => setTimeout(r, delay));
         }
+      }
+
+      // Flush remaining results
+      if (resultsBatch.length > 0) {
+        await supabase.from("campaign_results").insert(resultsBatch);
       }
 
       // Mark complete
@@ -364,7 +363,6 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }).eq("id", job_id);
 
-      // Update campaign stats
       await supabase.from("whatsapp_campaigns").update({
         sent_count: sentCount,
         failed_count: failedCount,
