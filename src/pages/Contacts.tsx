@@ -208,7 +208,8 @@ const Contacts = () => {
   const isPausedRef = useRef(false);
   const [pauseReason, setPauseReason] = useState<string | null>(null);
   const cancelCampaignRef = useRef(false);
-  
+  const currentJobIdRef = useRef<string | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const extractTemplateVariables = (body: string): string[] => {
     const matches = body.match(/\{\{\d+\}\}/g) || [];
     return [...new Set(matches)].sort((a, b) => {
@@ -292,6 +293,16 @@ const Contacts = () => {
       navigate("/plans");
     }
   }, [user, loading, role, hasAccess, navigate]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Load WhatsApp config and templates
   useEffect(() => {
@@ -917,6 +928,7 @@ const Contacts = () => {
             }
 
             const jobId = startResp.data.job_id;
+            currentJobIdRef.current = jobId;
 
             // Poll for progress from DB
             const pollInterval = setInterval(async () => {
@@ -925,7 +937,7 @@ const Contacts = () => {
                   .from('campaign_jobs')
                   .select('*')
                   .eq('id', jobId)
-                  .single();
+                  .maybeSingle();
 
                 if (!job) return;
 
@@ -942,6 +954,7 @@ const Contacts = () => {
 
                 if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed') {
                   clearInterval(pollInterval);
+                  pollIntervalRef.current = null;
                   const desc = job.status === 'cancelled'
                     ? `Cancelada. ${job.sent_count} enviadas, ${job.failed_count} falhas.`
                     : job.status === 'failed'
@@ -958,11 +971,7 @@ const Contacts = () => {
               }
             }, 3000);
 
-            // Store jobId and pollInterval for cancel action
-            cancelCampaignRef.current = false;
-            // Override cancel to call edge function
-            (window as any).__currentCampaignJobId = jobId;
-            (window as any).__currentCampaignPollInterval = pollInterval;
+            pollIntervalRef.current = pollInterval;
 
           } catch (error) {
             console.error('Erro ao enviar WhatsApp via Evolution:', error);
@@ -2147,7 +2156,7 @@ const Contacts = () => {
             navigate('/results');
           }}
           onCancel={async () => {
-            const jobId = (window as any).__currentCampaignJobId;
+            const jobId = currentJobIdRef.current;
             if (jobId) {
               try {
                 const { data: { session } } = await supabase.auth.getSession();
@@ -2155,8 +2164,10 @@ const Contacts = () => {
                   headers: { Authorization: `Bearer ${session?.access_token}` },
                   body: { action: 'cancel', job_id: jobId },
                 });
-                const pollInterval = (window as any).__currentCampaignPollInterval;
-                if (pollInterval) clearInterval(pollInterval);
+                if (pollIntervalRef.current) {
+                  clearInterval(pollIntervalRef.current);
+                  pollIntervalRef.current = null;
+                }
               } catch (err) {
                 console.error('Cancel error:', err);
               }
