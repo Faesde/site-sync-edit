@@ -415,15 +415,15 @@ const Results = () => {
           /* ========== CAMPAIGN LIST (no campaign selected) ========== */
           <>
             {campaigns.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground font-medium">Nenhuma campanha encontrada</p>
-                  <p className="text-sm text-muted-foreground">
+              <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                  <Users className="h-16 w-16 mx-auto mb-6 text-muted-foreground opacity-40" />
+                  <h2 className="text-xl font-semibold mb-2">Nenhuma campanha encontrada</h2>
+                  <p className="text-muted-foreground">
                     Envie sua primeira campanha para ver os resultados aqui
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ) : (
               <div className="space-y-3">
                 {/* Selection toolbar */}
