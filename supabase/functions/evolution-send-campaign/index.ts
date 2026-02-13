@@ -169,8 +169,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq("id", job_id);
 
-        // Re-invoke in 5 minutes to check again (non-blocking)
-        selfInvoke(supabaseUrl, serviceKey, job_id, 300_000);
+        // pg_cron will re-invoke this job every 2 minutes
         return new Response(JSON.stringify({ success: true, status: "paused_night" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -253,8 +252,7 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq("id", job_id);
 
-              // Re-invoke in 30s to check if reconnected
-              selfInvoke(supabaseUrl, serviceKey, job_id, 30_000);
+              // pg_cron will re-invoke this job every 2 minutes
               return new Response(JSON.stringify({ success: true, status: "paused_disconnected" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           } catch {}
@@ -269,7 +267,7 @@ serve(async (req) => {
               failed_count: failedCount,
               updated_at: new Date().toISOString(),
             }).eq("id", job_id);
-            selfInvoke(supabaseUrl, serviceKey, job_id, 300_000);
+            // pg_cron will re-invoke this job every 2 minutes
             return new Response(JSON.stringify({ success: true, status: "paused_night" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
         }
