@@ -33,6 +33,13 @@ import IntegrationDetail from "./pages/integrations/IntegrationDetail";
 
 // Admin Pages
 import Admin from "./pages/Admin";
+import AdminBlog from "./pages/admin/AdminBlog";
+import AdminTreinamentos from "./pages/admin/AdminTreinamentos";
+
+// Public Content Pages
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
+import Treinamentos from "./pages/Treinamentos";
 
 // Auth Pages
 import ResetPassword from "./pages/ResetPassword";
@@ -78,6 +85,13 @@ const App = () => (
             
             {/* Admin Pages */}
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/blog" element={<AdminBlog />} />
+            <Route path="/admin/treinamentos" element={<AdminTreinamentos />} />
+            
+            {/* Public Content Pages */}
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/treinamentos" element={<Treinamentos />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

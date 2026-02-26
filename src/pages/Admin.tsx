@@ -48,6 +48,8 @@ import {
   Key,
   Eye,
   EyeOff,
+  FileText,
+  GraduationCap,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -393,6 +395,16 @@ const Admin = () => {
             Atualizar
           </Button>
         </motion.div>
+
+        {/* Quick links */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <Button variant="outline" onClick={() => navigate("/admin/blog")}>
+            <FileText className="w-4 h-4 mr-2" />Gerenciar Blog
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/admin/treinamentos")}>
+            <GraduationCap className="w-4 h-4 mr-2" />Gerenciar Treinamentos
+          </Button>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
