@@ -10,6 +10,14 @@ import { supabaseWiki } from "@/lib/supabaseWiki";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+function formatContent(content: string): string {
+  if (content.includes("<p>")) return content;
+  return content
+    .split("\n\n")
+    .map((p) => "<p>" + p.replace(/\n/g, "<br/>") + "</p>")
+    .join("");
+}
+
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
 
@@ -66,7 +74,7 @@ const BlogPost = () => {
               </div>
               <div
                 className="prose prose-lg dark:prose-invert max-w-none text-foreground [&>p]:mb-4 [&>p]:leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: post.content.includes('<p>') ? post.content : post.content.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('') }}
+                dangerouslySetInnerHTML={{ __html: formatContent(post.content) }}
               />
             </article>
           )}
