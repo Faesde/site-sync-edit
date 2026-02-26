@@ -65,8 +65,8 @@ const BlogPost = () => {
                 <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{format(new Date(post.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
               </div>
               <div
-                className="prose prose-lg dark:prose-invert max-w-none text-foreground"
-                dangerouslySetInnerHTML={{ __html: post.content }}
+                className="prose prose-lg dark:prose-invert max-w-none text-foreground [&>p]:mb-4 [&>p]:leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: post.content.includes('<p>') ? post.content : post.content.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('') }}
               />
             </article>
           )}
