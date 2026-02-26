@@ -167,11 +167,11 @@ export const Header = () => {
               </NavigationMenuList>
             </NavigationMenu>
 
-            <Link to="/blog" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+            <Link to="/blog" className="relative text-accent hover:text-accent font-semibold px-3 py-2 transition-colors after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-accent after:transition-all hover:after:w-full">
               Blog
             </Link>
 
-            <Link to="/treinamentos" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+            <Link to="/treinamentos" className="relative text-accent hover:text-accent font-semibold px-3 py-2 transition-colors after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0.5 after:bg-accent after:transition-all hover:after:w-full">
               Treinamentos
             </Link>
 
@@ -345,18 +345,18 @@ export const Header = () => {
 
               <Link
                 to="/blog"
-                className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
+                className="text-accent font-semibold py-2 border-t border-white/10 pt-4"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Blog
+                ⭐ Blog
               </Link>
 
               <Link
                 to="/treinamentos"
-                className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
+                className="text-accent font-semibold py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Treinamentos
+                ⭐ Treinamentos
               </Link>
 
               {/* Mobile Ajuda */}
