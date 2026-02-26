@@ -167,6 +167,14 @@ export const Header = () => {
               </NavigationMenuList>
             </NavigationMenu>
 
+            <Link to="/blog" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+              Blog
+            </Link>
+
+            <Link to="/treinamentos" className="text-white/80 hover:text-white transition-colors font-medium px-3 py-2">
+              Treinamentos
+            </Link>
+
             {/* Ajuda Dropdown */}
             <NavigationMenu>
               <NavigationMenuList>
@@ -334,6 +342,22 @@ export const Header = () => {
                   </Link>
                 ))}
               </div>
+
+              <Link
+                to="/blog"
+                className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Blog
+              </Link>
+
+              <Link
+                to="/treinamentos"
+                className="text-white hover:text-accent transition-colors font-medium py-2 border-t border-white/10 pt-4"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Treinamentos
+              </Link>
 
               {/* Mobile Ajuda */}
               <div className="border-t border-white/10 pt-2">
