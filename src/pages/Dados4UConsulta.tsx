@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -7,28 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, User, Phone, Mail, Building, ArrowLeft, Database } from "lucide-react";
+import { Search, Loader2, ArrowLeft, Database, Key, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type ConsultaTipo = "cpf_cnpj" | "nome_completo" | "numero_telefone" | "email";
-
-const tipoLabels: Record<ConsultaTipo, string> = {
-  cpf_cnpj: "CPF / CNPJ",
-  nome_completo: "Nome Completo",
-  numero_telefone: "Telefone",
-  email: "E-mail",
-};
-
-const tipoIcons: Record<ConsultaTipo, typeof User> = {
-  cpf_cnpj: User,
-  nome_completo: User,
-  numero_telefone: Phone,
-  email: Mail,
-};
 
 const tipoPlaceholders: Record<ConsultaTipo, string> = {
   cpf_cnpj: "000.000.000-00 ou 00.000.000/0001-00",
@@ -37,13 +22,31 @@ const tipoPlaceholders: Record<ConsultaTipo, string> = {
   email: "email@exemplo.com",
 };
 
+const STORAGE_KEY = "dados4u_api_key";
+
 const Dados4UConsulta = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [tipo, setTipo] = useState<ConsultaTipo>("cpf_cnpj");
   const [valor, setValor] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) setApiKey(saved);
+  }, []);
+
+  const handleSaveApiKey = (value: string) => {
+    setApiKey(value);
+    if (value.trim()) {
+      localStorage.setItem(STORAGE_KEY, value.trim());
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
 
   if (!loading && !user) {
     navigate("/login");
@@ -55,13 +58,17 @@ const Dados4UConsulta = () => {
       toast.error("Preencha o campo de busca");
       return;
     }
+    if (!apiKey.trim()) {
+      toast.error("Configure sua API Key do Dados4U primeiro");
+      return;
+    }
 
     setIsSearching(true);
     setResultado(null);
 
     try {
       const { data, error } = await supabase.functions.invoke("dados4u-consultar-index-ts", {
-        body: { tipo, valor: valor.trim() },
+        body: { tipo, valor: valor.trim(), api_key: apiKey.trim() },
       });
 
       if (error) throw error;
@@ -82,8 +89,6 @@ const Dados4UConsulta = () => {
 
   const renderResultado = () => {
     if (!resultado) return null;
-
-    // Handle both single result and array
     const items = Array.isArray(resultado) ? resultado : [resultado];
 
     return (
@@ -153,20 +158,54 @@ const Dados4UConsulta = () => {
             </div>
           </motion.div>
 
+          {/* API Key Config */}
           <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Key className="w-5 h-5" />
+                API Key do Dados4U
+              </CardTitle>
+              <CardDescription>
+                Gere sua chave em{" "}
+                <a href="https://dados4u.com.br" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                  dados4u.com.br
+                </a>{" "}
+                e cole abaixo. A chave fica salva apenas no seu navegador.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showApiKey ? "text" : "password"}
+                    placeholder="Cole sua API Key aqui"
+                    value={apiKey}
+                    onChange={(e) => handleSaveApiKey(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Search */}
+          <Card className="mt-4">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="w-5 h-5" />
                 Nova Consulta
               </CardTitle>
-              <CardDescription>
-                Selecione o tipo de busca e insira o valor para consultar.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-48">
-                  <Label htmlFor="tipo">Tipo</Label>
+                  <Label>Tipo</Label>
                   <Select value={tipo} onValueChange={(v) => setTipo(v as ConsultaTipo)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -180,9 +219,8 @@ const Dados4UConsulta = () => {
                   </Select>
                 </div>
                 <div className="flex-1">
-                  <Label htmlFor="valor">Valor</Label>
+                  <Label>Valor</Label>
                   <Input
-                    id="valor"
                     placeholder={tipoPlaceholders[tipo]}
                     value={valor}
                     onChange={(e) => setValor(e.target.value)}
@@ -190,7 +228,7 @@ const Dados4UConsulta = () => {
                   />
                 </div>
                 <div className="flex items-end">
-                  <Button onClick={handleConsulta} disabled={isSearching} className="w-full md:w-auto">
+                  <Button onClick={handleConsulta} disabled={isSearching || !apiKey.trim()} className="w-full md:w-auto">
                     {isSearching ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
