@@ -27,7 +27,7 @@ const integrations = [
   { name: "Dados4U", logo: "https://dados4u.com.br/favicon.ico", href: "/integrations/dados4u", category: "Dados" },
 ];
 
-const categories = ["E-commerce", "Infoprodutos", "CRM", "Automacao", "Email", "Produtividade", "Dados"];
+const categories = ["E-commerce", "Infoprodutos", "CRM", "Automa\u00e7\u00e3o", "Email", "Produtividade", "Dados"];
 
 export default function IntegrationsPage() {
   return (
