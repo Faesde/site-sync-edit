@@ -30,6 +30,7 @@ import VoiceMarketing from "./pages/features/VoiceMarketing";
 // Integration Pages
 import IntegrationsPage from "./pages/integrations/IntegrationsPage";
 import IntegrationDetail from "./pages/integrations/IntegrationDetail";
+import Dados4UConsulta from "./pages/Dados4UConsulta";
 
 // Admin Pages
 import Admin from "./pages/Admin";
@@ -82,6 +83,7 @@ const App = () => (
             {/* Integration Pages */}
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/integrations/:slug" element={<IntegrationDetail />} />
+            <Route path="/dados4u" element={<Dados4UConsulta />} />
             
             {/* Admin Pages */}
             <Route path="/admin" element={<Admin />} />

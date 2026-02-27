@@ -24,9 +24,10 @@ const integrations = [
   { name: "n8n", logo: "https://logo.clearbit.com/n8n.io", href: "#", category: "Automação" },
   { name: "Google Sheets", logo: "https://logo.clearbit.com/google.com", href: "#", category: "Produtividade" },
   { name: "Mailchimp", logo: "https://logo.clearbit.com/mailchimp.com", href: "#", category: "Email" },
+  { name: "Dados4U", logo: "https://dados4u.com.br/favicon.ico", href: "/integrations/dados4u", category: "Dados" },
 ];
 
-const categories = ["E-commerce", "Infoprodutos", "CRM", "Automação", "Email", "Produtividade"];
+const categories = ["E-commerce", "Infoprodutos", "CRM", "Automacao", "Email", "Produtividade", "Dados"];
 
 export default function IntegrationsPage() {
   return (

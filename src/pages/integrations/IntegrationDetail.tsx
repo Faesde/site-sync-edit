@@ -55,12 +55,25 @@ const integrationData: Record<string, { name: string; logo: string; description:
   cartpanda: {
     name: "Cartpanda",
     logo: "https://logo.clearbit.com/cartpanda.com",
-    description: "Integração nativa com Cartpanda para e-commerce.",
+    description: "Integracao nativa com Cartpanda para e-commerce.",
     features: [
-      "Sincronização de pedidos",
-      "Recuperação de carrinhos",
-      "Notificações automáticas",
+      "Sincronizacao de pedidos",
+      "Recuperacao de carrinhos",
+      "Notificacoes automaticas",
       "Campanhas de marketing",
+    ],
+  },
+  dados4u: {
+    name: "Dados4U",
+    logo: "https://dados4u.com.br/favicon.ico",
+    description: "Consulte e enriqueca seus contatos com dados de CPF, CNPJ, telefone e e-mail em tempo real.",
+    features: [
+      "Consulta por CPF e CNPJ",
+      "Busca por nome completo",
+      "Consulta por numero de telefone",
+      "Consulta por e-mail",
+      "Enriquecimento automatico de contatos",
+      "API integrada diretamente na plataforma",
     ],
   },
 };

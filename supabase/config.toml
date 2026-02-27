@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.delete-campaign]
 verify_jwt = false
+
+[functions.dados4u-consultar]
+verify_jwt = false

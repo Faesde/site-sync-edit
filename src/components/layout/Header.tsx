@@ -41,6 +41,7 @@ const integracoesLinks = [
   { label: "Yampi", href: "/integrations/yampi" },
   { label: "Kiwify", href: "/integrations/kiwify" },
   { label: "Cartpanda", href: "/integrations/cartpanda" },
+  { label: "Dados4U", href: "/integrations/dados4u" },
   { label: "Todas", href: "/integrations" },
 ];
 

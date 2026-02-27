@@ -25,6 +25,7 @@ const integrations = [
   { name: "Amazon", logo: "https://logo.clearbit.com/amazon.com", description: "Marketplace global" },
   { name: "Magazine Luiza", logo: "https://logo.clearbit.com/magazineluiza.com.br", description: "Varejo brasileiro" },
   { name: "Google Sheets", logo: "https://logo.clearbit.com/google.com", description: "Planilhas na nuvem" },
+  { name: "Dados4U", logo: "https://dados4u.com.br/favicon.ico", description: "Consulta de dados por CPF, CNPJ, telefone e e-mail" },
 ];
 
 // Duplicate for infinite scroll effect
