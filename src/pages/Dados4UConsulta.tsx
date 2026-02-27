@@ -67,7 +67,7 @@ const Dados4UConsulta = () => {
     setResultado(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("dados4u-consultar-index-ts", {
+      const { data, error } = await supabase.functions.invoke("dados4u-consultar", {
         body: { tipo, valor: valor.trim(), api_key: apiKey.trim() },
       });
 
