@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, LogOut, Settings, LayoutDashboard, MessageSquare, ChevronDown } from "lucide-react";
+import { Menu, X, LogOut, Settings, LayoutDashboard, MessageSquare, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -251,6 +251,12 @@ export const Header = () => {
                       Configurações
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/dados4u" className="flex items-center gap-2 cursor-pointer">
+                      <Search className="h-4 w-4" />
+                      Consulta Dados4U
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleSignOut}
@@ -410,6 +416,12 @@ export const Header = () => {
                       <Button variant="outlineLight" className="w-full justify-start gap-2">
                         <Settings className="h-4 w-4" />
                         Configurações
+                      </Button>
+                    </Link>
+                    <Link to="/dados4u" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outlineLight" className="w-full justify-start gap-2">
+                        <Search className="h-4 w-4" />
+                        Consulta Dados4U
                       </Button>
                     </Link>
                     <Button
