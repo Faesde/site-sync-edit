@@ -11,10 +11,14 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 function formatContent(content: string): string {
-  if (content.includes("<p>")) return content;
-  return content
-    .split("\n\n")
-    .map((p) => "<p>" + p.replace(/\n/g, "<br/>") + "</p>")
+  if (content.includes("<p>")) {
+    return content;
+  }
+  const paragraphs = content.split("\n\n");
+  return paragraphs
+    .map(function (p) {
+      return "<p>" + p.replace(/\n/g, "<br/>") + "</p>";
+    })
     .join("");
 }
 
@@ -42,7 +46,10 @@ const BlogPost = () => {
       <main className="flex-1">
         <div className="max-w-4xl mx-auto px-4 py-12">
           <Link to="/blog">
-            <Button variant="ghost" className="mb-6"><ArrowLeft className="h-4 w-4 mr-2" />Voltar ao Blog</Button>
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar ao Blog
+            </Button>
           </Link>
 
           {isLoading ? (
@@ -55,22 +62,36 @@ const BlogPost = () => {
             </div>
           ) : !post ? (
             <div className="text-center py-20">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Post não encontrado</h2>
-              <p className="text-muted-foreground">O artigo que você procura não existe ou não está publicado.</p>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Post nao encontrado</h2>
+              <p className="text-muted-foreground">O artigo que voce procura nao existe ou nao esta publicado.</p>
             </div>
           ) : (
             <article>
               {post.cover_image_url && (
-                <img src={post.cover_image_url} alt={post.title} className="w-full h-64 md:h-96 object-cover rounded-xl mb-8" />
+                <img
+                  src={post.cover_image_url}
+                  alt={post.title}
+                  className="w-full h-64 md:h-96 object-cover rounded-xl mb-8"
+                />
               )}
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 {post.category && <Badge>{post.category}</Badge>}
-                {(post.tags || []).map((tag: string) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+                {(post.tags || []).map((tag: string) => (
+                  <Badge key={tag} variant="outline">{tag}</Badge>
+                ))}
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">{post.title}</h1>
               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8">
-                {post.author && <span className="flex items-center gap-1"><User className="h-4 w-4" />{post.author}</span>}
-                <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{format(new Date(post.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                {post.author && (
+                  <span className="flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    {post.author}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {format(new Date(post.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </span>
               </div>
               <div
                 className="prose prose-lg dark:prose-invert max-w-none text-foreground [&>p]:mb-4 [&>p]:leading-relaxed"
