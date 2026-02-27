@@ -51,6 +51,10 @@ import {
   WifiOff,
   Phone,
   Shield,
+  Database,
+  Key,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -159,6 +163,25 @@ const Settings = () => {
   const [evolutionTemplateContent, setEvolutionTemplateContent] = useState('');
   const [evolutionPollOptions, setEvolutionPollOptions] = useState<string[]>([]);
   const [isSavingEvolutionTemplate, setIsSavingEvolutionTemplate] = useState(false);
+
+  // Dados4U state
+  const [dados4uApiKey, setDados4uApiKey] = useState('');
+  const [showDados4uKey, setShowDados4uKey] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('dados4u_api_key');
+    if (saved) setDados4uApiKey(saved);
+  }, []);
+
+  const handleSaveDados4uKey = () => {
+    if (dados4uApiKey.trim()) {
+      localStorage.setItem('dados4u_api_key', dados4uApiKey.trim());
+      toast.success('API Key do Dados4U salva com sucesso!');
+    } else {
+      localStorage.removeItem('dados4u_api_key');
+      toast.info('API Key removida');
+    }
+  };
 
   // Meta template form state
   const [templateName, setTemplateName] = useState('');
@@ -861,7 +884,7 @@ const Settings = () => {
           </h1>
 
           <Tabs defaultValue="whatsapp" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="whatsapp" className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4" />
                 WhatsApp
@@ -869,6 +892,10 @@ const Settings = () => {
               <TabsTrigger value="templates" className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Templates
+              </TabsTrigger>
+              <TabsTrigger value="dados4u" className="flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                Dados4U
               </TabsTrigger>
             </TabsList>
 
@@ -1519,6 +1546,63 @@ const Settings = () => {
                         ))}
                       </div>
                     )
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Dados4U Tab */}
+            <TabsContent value="dados4u" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    Integração Dados4U
+                  </CardTitle>
+                  <CardDescription>
+                    Configure sua API Key do Dados4U para consultar e enriquecer seus contatos com dados de CPF, CNPJ, telefone e e-mail.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="dados4u-key" className="flex items-center gap-2 mb-2">
+                      <Key className="w-4 h-4" />
+                      API Key
+                    </Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          id="dados4u-key"
+                          type={showDados4uKey ? "text" : "password"}
+                          placeholder="Cole sua API Key do Dados4U aqui"
+                          value={dados4uApiKey}
+                          onChange={(e) => setDados4uApiKey(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowDados4uKey(!showDados4uKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showDados4uKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <Button onClick={handleSaveDados4uKey}>
+                        Salvar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Gere sua chave em{" "}
+                      <a href="https://dados4u.com.br" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        dados4u.com.br
+                      </a>
+                      . A chave fica salva no seu navegador.
+                    </p>
+                  </div>
+                  {dados4uApiKey && (
+                    <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
+                      <CheckCircle className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-foreground">API Key configurada. Acesse a <a href="/dados4u" className="text-primary underline font-medium">página de consulta</a> para realizar buscas.</span>
+                    </div>
                   )}
                 </CardContent>
               </Card>

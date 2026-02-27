@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2, ArrowLeft, Database, Key, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Search, Loader2, ArrowLeft, Database, AlertCircle, Phone, Mail, MapPin, Users, Building2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,7 +30,6 @@ const Dados4UConsulta = () => {
   const [tipo, setTipo] = useState<ConsultaTipo>("cpf_cnpj");
   const [valor, setValor] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
 
@@ -38,15 +37,6 @@ const Dados4UConsulta = () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) setApiKey(saved);
   }, []);
-
-  const handleSaveApiKey = (value: string) => {
-    setApiKey(value);
-    if (value.trim()) {
-      localStorage.setItem(STORAGE_KEY, value.trim());
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  };
 
   if (!loading && !user) {
     navigate("/login");
@@ -59,7 +49,7 @@ const Dados4UConsulta = () => {
       return;
     }
     if (!apiKey.trim()) {
-      toast.error("Configure sua API Key do Dados4U primeiro");
+      toast.error("Configure sua API Key nas Configurações primeiro");
       return;
     }
 
@@ -87,6 +77,111 @@ const Dados4UConsulta = () => {
     }
   };
 
+  const renderPhones = (label: string, phones: any[], icon: React.ReactNode) => {
+    if (!phones || phones.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          {icon} {label}
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {phones.map((p: any, i: number) => (
+            <div key={i} className="p-3 bg-muted rounded-lg">
+              <p className="font-medium text-foreground">{p.numero || p.telefone || JSON.stringify(p)}</p>
+              {p.situacao && <p className="text-xs text-muted-foreground mt-1">{p.situacao}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderEmails = (emails: any[]) => {
+    if (!emails || emails.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          <Mail className="w-4 h-4" /> E-mails
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {emails.map((e: any, i: number) => (
+            <div key={i} className="p-3 bg-muted rounded-lg">
+              <p className="font-medium text-foreground">{e.email || JSON.stringify(e)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderEnderecos = (enderecos: any[]) => {
+    if (!enderecos || enderecos.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          <MapPin className="w-4 h-4" /> Endereços
+        </h4>
+        {enderecos.map((e: any, i: number) => (
+          <div key={i} className="p-3 bg-muted rounded-lg">
+            {typeof e === "object" ? (
+              <p className="text-foreground">
+                {[e.logradouro, e.numero, e.complemento, e.bairro, e.cidade, e.estado, e.cep].filter(Boolean).join(", ")}
+              </p>
+            ) : (
+              <p className="text-foreground">{String(e)}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderSociedade = (sociedade: any[]) => {
+    if (!sociedade || sociedade.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          <Building2 className="w-4 h-4" /> Sociedade
+        </h4>
+        {sociedade.map((s: any, i: number) => (
+          <div key={i} className="p-3 bg-muted rounded-lg grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {s.razao_social && (
+              <div><span className="text-xs text-muted-foreground">Razão Social</span><p className="font-medium text-foreground">{s.razao_social}</p></div>
+            )}
+            {s.cnpj && (
+              <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-medium text-foreground">{s.cnpj}</p></div>
+            )}
+            {s.participacao && (
+              <div><span className="text-xs text-muted-foreground">Participação</span><p className="font-medium text-foreground">{s.participacao}</p></div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderParentes = (parentes: any[]) => {
+    if (!parentes || parentes.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+          <Users className="w-4 h-4" /> Parentes
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {parentes.map((p: any, i: number) => (
+            <div key={i} className="p-3 bg-muted rounded-lg">
+              <p className="font-medium text-foreground">{p.nome || JSON.stringify(p)}</p>
+              {p.parentesco && <p className="text-xs text-muted-foreground">{p.parentesco}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Separate known array/object fields from scalar fields
+  const arrayFields = ["telefones_celulares", "telefones_fixos", "emails", "enderecos", "parentes", "sociedade"];
+
   const renderResultado = () => {
     if (!resultado) return null;
     const items = Array.isArray(resultado) ? resultado : [resultado];
@@ -101,37 +196,42 @@ const Dados4UConsulta = () => {
           <Database className="w-5 h-5 text-primary" />
           Resultados ({items.length})
         </h3>
-        {items.map((item: any, index: number) => (
-          <Card key={index} className="border-primary/20">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(item).map(([key, value]) => {
-                  if (value === null || value === undefined || value === "") return null;
-                  if (typeof value === "object") {
-                    return (
-                      <div key={key} className="col-span-full">
-                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                          {key.replace(/_/g, " ")}
-                        </span>
-                        <pre className="mt-1 text-sm text-foreground bg-muted p-3 rounded-lg overflow-x-auto">
-                          {JSON.stringify(value, null, 2)}
-                        </pre>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={key}>
-                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                        {key.replace(/_/g, " ")}
-                      </span>
-                      <p className="mt-1 text-foreground font-medium">{String(value)}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {items.map((item: any, index: number) => {
+          const scalarEntries = Object.entries(item).filter(
+            ([key, value]) => !arrayFields.includes(key) && typeof value !== "object"
+          );
+
+          return (
+            <Card key={index} className="border-primary/20">
+              <CardContent className="pt-6 space-y-6">
+                {/* Scalar fields in a grid */}
+                {scalarEntries.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {scalarEntries.map(([key, value]) => {
+                      if (value === null || value === undefined || value === "") return null;
+                      return (
+                        <div key={key}>
+                          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            {key.replace(/_/g, " ")}
+                          </span>
+                          <p className="mt-0.5 text-foreground font-medium text-sm">{String(value)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Structured fields */}
+                {renderPhones("Telefones Celulares", item.telefones_celulares, <Phone className="w-4 h-4" />)}
+                {renderPhones("Telefones Fixos", item.telefones_fixos, <Phone className="w-4 h-4" />)}
+                {renderEmails(item.emails)}
+                {renderEnderecos(item.enderecos)}
+                {renderParentes(item.parentes)}
+                {renderSociedade(item.sociedade)}
+              </CardContent>
+            </Card>
+          );
+        })}
       </motion.div>
     );
   };
@@ -158,41 +258,26 @@ const Dados4UConsulta = () => {
             </div>
           </motion.div>
 
-          {/* API Key Config */}
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Key className="w-5 h-5" />
-                API Key do Dados4U
-              </CardTitle>
-              <CardDescription>
-                Gere sua chave em{" "}
-                <a href="https://dados4u.com.br" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                  dados4u.com.br
-                </a>{" "}
-                e cole abaixo. A chave fica salva apenas no seu navegador.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    type={showApiKey ? "text" : "password"}
-                    placeholder="Cole sua API Key aqui"
-                    value={apiKey}
-                    onChange={(e) => handleSaveApiKey(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+          {/* No API Key Warning */}
+          {!apiKey && (
+            <Card className="mt-8 border-destructive/30 bg-destructive/5">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-foreground">API Key não configurada</p>
+                    <p className="text-sm text-muted-foreground">
+                      Configure sua API Key em{" "}
+                      <Link to="/settings" className="text-primary underline font-medium">
+                        Configurações &gt; Dados4U
+                      </Link>{" "}
+                      para realizar consultas.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Search */}
           <Card className="mt-4">
