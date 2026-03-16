@@ -52,7 +52,7 @@ export const FAQ = () => {
             Perguntas <span className="text-accent">frequentes</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Tire suas dúvidas de como funciona a Wiki Marketing!
+            Tire suas dúvidas de como funciona a WikiHub!
           </p>
         </motion.div>
 

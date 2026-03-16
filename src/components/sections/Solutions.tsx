@@ -84,7 +84,7 @@ export const Solutions = () => {
                 {/* Header */}
                 <div className="mb-6">
                   <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Wiki Marketing para
+                    WikiHub para
                   </span>
                   <div className="flex items-center gap-3 mt-2">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${

@@ -140,7 +140,7 @@ export const Footer = () => {
         {/* Bottom Bar */}
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-white/60">
-            © 2024 Wiki Marketing. Todos os direitos reservados.
+            © 2024 WikiHub. Todos os direitos reservados.
           </p>
           <div className="flex gap-6 text-sm text-white/60">
             <a href="#" className="hover:text-accent transition-colors">
