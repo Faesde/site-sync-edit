@@ -14,7 +14,7 @@
 // INFORMAÇÕES DA EMPRESA
 // ====================================
 export const COMPANY_CONFIG = {
-  name: 'WikiMarketing',
+  name: 'WikiHub',
   tagline: 'Geração de Leads Inteligente',
   description: 'Plataforma completa para geração e gestão de leads com automação inteligente.',
   email: 'contato@wikimarketing.com.br',

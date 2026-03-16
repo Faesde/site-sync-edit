@@ -61,7 +61,7 @@ export const Stats = () => {
             Números que <span className="text-accent">impressionam</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Milhares de empresas já transformaram seus resultados com a Wiki Marketing
+            Milhares de empresas já transformaram seus resultados com a WikiHub
           </p>
         </motion.div>
 

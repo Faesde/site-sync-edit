@@ -19,7 +19,7 @@ export const CTA = () => {
         >
           <h2 className="font-display text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
             Descubra o porquê a{" "}
-            <span className="text-accent">Wiki Marketing é a ferramenta certa</span>{" "}
+            <span className="text-accent">WikiHub é a ferramenta certa</span>{" "}
             para o seu negócio!
           </h2>
 

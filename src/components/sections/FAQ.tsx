@@ -8,15 +8,15 @@ import {
 
 const faqs = [
   {
-    question: "O que é a Wiki Marketing?",
-    answer: "A Wiki Marketing é uma plataforma de marketing para E-commerces, Infoprodutos e Negócios Locais. Nossa ferramenta permite a comunicação com os seus clientes de modo prático e ágil, além de ferramentas que irão alavancar o seu negócio nos canais digitais, aumentando as suas vendas e conversões."
+    question: "O que é a WikiHub?",
+    answer: "A WikiHub é uma plataforma de marketing para E-commerces, Infoprodutos e Negócios Locais. Nossa ferramenta permite a comunicação com os seus clientes de modo prático e ágil, além de ferramentas que irão alavancar o seu negócio nos canais digitais, aumentando as suas vendas e conversões."
   },
   {
     question: "Possui suporte?",
     answer: "Sim, oferecemos suporte total da nossa ferramenta para clientes e interessados. Horário de Atendimento: Segunda a Sexta: 9h-12h e 14h-17h, Sábado: 9h-12h. O acesso ao suporte fica disponível dentro da nossa plataforma."
   },
   {
-    question: "A Wiki Marketing envia mensagens automáticas de WhatsApp?",
+    question: "A WikiHub envia mensagens automáticas de WhatsApp?",
     answer: "Sim! Temos dois métodos de envio: Automações e Campanhas Avançadas (envio automático, sem necessidade de ação humana, basta configurar uma vez e deixar funcionando) e através de disparos manuais para campanhas específicas."
   },
   {
@@ -52,7 +52,7 @@ export const FAQ = () => {
             Perguntas <span className="text-accent">frequentes</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Tire suas dúvidas de como funciona a Wiki Marketing!
+            Tire suas dúvidas de como funciona a WikiHub!
           </p>
         </motion.div>
 
