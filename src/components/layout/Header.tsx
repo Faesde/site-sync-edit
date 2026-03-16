@@ -94,7 +94,7 @@ export const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <span className="font-display font-bold text-2xl text-white">
-              Wiki<span className="text-accent">Marketing</span>
+              Wiki<span className="text-accent">Hub</span>
             </span>
           </Link>
 

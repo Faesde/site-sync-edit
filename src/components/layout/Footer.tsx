@@ -47,7 +47,7 @@ export const Footer = () => {
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-6">
               <span className="font-display font-bold text-2xl text-white">
-                Wiki<span className="text-accent">Marketing</span>
+                Wiki<span className="text-accent">Hub</span>
               </span>
             </Link>
             
