@@ -8,8 +8,8 @@ import {
 
 const faqs = [
   {
-    question: "O que é a Wiki Marketing?",
-    answer: "A Wiki Marketing é uma plataforma de marketing para E-commerces, Infoprodutos e Negócios Locais. Nossa ferramenta permite a comunicação com os seus clientes de modo prático e ágil, além de ferramentas que irão alavancar o seu negócio nos canais digitais, aumentando as suas vendas e conversões."
+    question: "O que é a WikiHub?",
+    answer: "A WikiHub é uma plataforma de marketing para E-commerces, Infoprodutos e Negócios Locais. Nossa ferramenta permite a comunicação com os seus clientes de modo prático e ágil, além de ferramentas que irão alavancar o seu negócio nos canais digitais, aumentando as suas vendas e conversões."
   },
   {
     question: "Possui suporte?",
