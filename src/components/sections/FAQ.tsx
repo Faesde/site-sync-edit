@@ -16,7 +16,7 @@ const faqs = [
     answer: "Sim, oferecemos suporte total da nossa ferramenta para clientes e interessados. Horário de Atendimento: Segunda a Sexta: 9h-12h e 14h-17h, Sábado: 9h-12h. O acesso ao suporte fica disponível dentro da nossa plataforma."
   },
   {
-    question: "A Wiki Marketing envia mensagens automáticas de WhatsApp?",
+    question: "A WikiHub envia mensagens automáticas de WhatsApp?",
     answer: "Sim! Temos dois métodos de envio: Automações e Campanhas Avançadas (envio automático, sem necessidade de ação humana, basta configurar uma vez e deixar funcionando) e através de disparos manuais para campanhas específicas."
   },
   {
