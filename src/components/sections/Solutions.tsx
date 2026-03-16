@@ -62,7 +62,7 @@ export const Solutions = () => {
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl md:text-5xl font-bold text-foreground mb-4">
-            Para quem a <span className="text-primary">Wiki Marketing</span> é indicada?
+            Para quem a <span className="text-primary">WikiHub</span> é indicada?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Soluções específicas para cada tipo de negócio
