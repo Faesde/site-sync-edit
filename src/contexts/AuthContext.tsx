@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseWiki } from '@/lib/supabaseWiki';
 
 type AppRole = 'admin' | 'user';
-type SubscriptionStatus = 'inactive' | 'active' | 'trial';
 
 interface Profile {
   id: string;
@@ -47,29 +46,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchProfile = async (userId: string) => {
     // Avoid `.single()` here: if the row doesn't exist yet, PostgREST returns 406.
     // Fetch as a list and pick the first row so the request stays 200 ([]) when empty.
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-    const { data: profileRows } = await supabaseWiki
+    const { data: profileRows, error: profileError } = await supabaseWiki
       .from('profiles')
       .select('id, user_id, full_name, email')
       .eq('user_id', userId)
       .limit(1);
 
-    setProfile((profileRows?.[0] as Profile) ?? null);
+    if (profileError) {
+      console.error('Error fetching wiki profile:', profileError);
+    }
 
-    const { data: roleRows } = await supabaseWiki
+    setProfile(
+      (profileRows?.[0] as Profile) ?? {
+        id: userId,
+        user_id: userId,
+        full_name: currentUser?.user_metadata?.full_name ?? null,
+        email: currentUser?.email ?? null,
+      }
+    );
+
+    const { data: roleRows, error: roleError } = await supabaseWiki
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
       .limit(1);
 
+    if (roleError) {
+      console.error('Error fetching wiki user role:', roleError);
+    }
+
     // Default to 'user' role when no role is found (prevents infinite loading)
     setRole((roleRows?.[0]?.role as AppRole) ?? 'user');
 
-    const { data: subscriptionRows } = await supabaseWiki
+    const { data: subscriptionRows, error: subscriptionError } = await supabaseWiki
       .from('subscriptions')
       .select('status, plan, current_period_end')
       .eq('user_id', userId)
       .limit(1);
+
+    if (subscriptionError) {
+      console.error('Error fetching wiki subscription:', subscriptionError);
+    }
 
     setSubscription((subscriptionRows?.[0] as Subscription) ?? null);
   };
@@ -83,29 +102,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const syncAuthState = async () => {
+          setLoading(true);
+
+          try {
+            setSession(session);
+            setUser(session?.user ?? null);
+
+            if (session?.user) {
+              await fetchProfile(session.user.id);
+            } else {
+              setProfile(null);
+              setRole(null);
+              setSubscription(null);
+            }
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        setTimeout(() => {
+          syncAuthState();
+        }, 0);
+      }
+    );
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      try {
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
 
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
+          await fetchProfile(session.user.id);
         } else {
           setProfile(null);
           setRole(null);
           setSubscription(null);
         }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      if (session?.user) {
-        fetchProfile(session.user.id);
+      } finally {
+        setLoading(false);
       }
     });
 
