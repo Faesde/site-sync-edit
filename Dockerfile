@@ -2,7 +2,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 COPY bun.lockb* bun.lock* ./
-RUN npm install && npm rebuild esbuild
+RUN npm ci && npm rebuild esbuild
 COPY . .
 RUN npm run build
 
