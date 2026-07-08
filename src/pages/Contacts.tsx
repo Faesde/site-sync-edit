@@ -52,6 +52,7 @@ import { CampaignNameModal } from "@/components/CampaignNameModal";
 import { IVRConfigEditor, type IVRMenuItem } from "@/components/IVRConfigEditor";
 import { toast } from "@/hooks/use-toast";
 import { CampaignProgressModal } from "@/components/CampaignProgressModal";
+import { CONTACTS_CONFIG } from "@/config/app.config";
 
 interface Contact {
   id: string;
@@ -323,7 +324,7 @@ const Contacts = () => {
           // If Evolution provider, load instances and templates
           if (configData.provider === 'evolution') {
             // Load Evolution instances
-            const { data: instancesResponse } = await supabase.functions.invoke('evolution-get-instances-index-ts');
+            const { data: instancesResponse } = await supabase.functions.invoke('evolution-get-instances');
             if (instancesResponse?.success && instancesResponse?.instances) {
               const connectedInstances = instancesResponse.instances.filter(
                 (inst: EvolutionInstance) => inst.status === 'connected'
@@ -697,11 +698,6 @@ const Contacts = () => {
           callAudioUrl = signedUrlData.signedUrl;
         }
 
-        // Gerar ID de campanha único para WhatsApp
-        const campaignId = selectedActions.includes('whatsapp') 
-          ? `campaign_${user?.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          : null;
-
         // Encontrar template selecionado
         const selectedTemplate = selectedTemplateId 
           ? whatsappTemplates.find(t => t.id === selectedTemplateId)
@@ -837,14 +833,14 @@ const Contacts = () => {
               console.log(`Enviadas: ${response.data.sent}, Falhas: ${response.data.failed}`);
               
               // Update campaign stats
-              if (campaignId && user) {
+              if (user) {
                 await supabaseWiki
                   .from('whatsapp_campaigns')
                   .update({
                     sent_count: response.data.sent || 0,
                     failed_count: response.data.failed || 0,
                   })
-                  .eq('id', campaignId);
+                  .eq('id', unifiedCampaignId);
               }
               
               toast({
@@ -984,9 +980,8 @@ const Contacts = () => {
         // Se há outras ações além de WhatsApp, envia para o webhook padrão
         const otherActions = selectedActions.filter(a => a !== 'whatsapp');
         if (otherActions.length > 0) {
-          const defaultWebhook = "https://n8neditor.faesde.com.br/webhook/send-rabbit";
           const otherPayload = { ...payload, actions: otherActions };
-          const response = await fetch(defaultWebhook, {
+          const response = await fetch(CONTACTS_CONFIG.webhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(otherPayload),

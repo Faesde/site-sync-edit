@@ -129,7 +129,7 @@ const Results = () => {
   useEffect(() => {
     if (user) {
       fetchData();
-      setupRealtime();
+      return setupRealtime();
     }
   }, [user]);
 
