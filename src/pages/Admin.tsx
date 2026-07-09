@@ -790,7 +790,6 @@ const Admin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </div>
     </AppShell>
   );
 };
