@@ -62,6 +62,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { supabaseWiki } from "@/lib/supabaseWiki";
 import { toast } from "sonner";
 import { SetupGuide } from "@/components/SetupGuide";
+import { AppShell } from "@/components/layout/AppShell";
 
 type WhatsAppProvider = 'evolution' | 'cloudapi';
 type TemplateStatus = 'pending' | 'approved' | 'rejected';
@@ -834,9 +835,22 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppShell
+      title="Configurações"
+      eyebrow="Setup"
+      description="Conecte canais, templates e fontes de dados para manter suas campanhas prontas para execução."
+      maxWidth="standard"
+      actions={
+        isAdmin ? (
+          <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
+            <Shield className="h-4 w-4" />
+            Admin
+          </Button>
+        ) : null
+      }
+    >
       {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+      <div className="hidden">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate('/contacts')}>
@@ -871,20 +885,20 @@ const Settings = () => {
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="space-y-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="text-2xl font-display font-bold text-foreground mb-6">
+          <h1 className="hidden">
             Configurações
           </h1>
 
           <Tabs defaultValue="whatsapp" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3 rounded-lg bg-white p-1 shadow-sm dark:bg-slate-900">
               <TabsTrigger value="whatsapp" className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4" />
                 WhatsApp
@@ -1609,7 +1623,7 @@ const Settings = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-      </main>
+      </div>
 
       {/* QR Code Dialog */}
       <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
@@ -1687,7 +1701,7 @@ const Settings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppShell>
   );
 };
 

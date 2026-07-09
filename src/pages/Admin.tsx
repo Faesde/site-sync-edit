@@ -58,6 +58,7 @@ import { supabaseWiki } from "@/lib/supabaseWiki";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AppShell } from "@/components/layout/AppShell";
 
 interface UserWithDetails {
   user_id: string;
@@ -364,13 +365,29 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+    <AppShell
+      title="Administração"
+      eyebrow="Operações"
+      description="Gerencie usuários, planos, permissões e conteúdo do workspace."
+      actions={
+        <>
+          <Button onClick={loadUsers} variant="outline" size="sm" disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+            <ArrowLeft className="h-4 w-4" />
+            Configurações
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
+          className="hidden"
         >
           <div className="flex items-center gap-4">
             <Button
@@ -773,7 +790,8 @@ const Admin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </AppShell>
   );
 };
 

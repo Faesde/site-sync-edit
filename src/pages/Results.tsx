@@ -56,6 +56,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AppShell } from "@/components/layout/AppShell";
 
 interface Campaign {
   id: string;
@@ -387,11 +388,25 @@ const Results = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Header />
-      <main className="container mx-auto px-4 py-8 flex-1">
+    <AppShell
+      title="Resultados"
+      eyebrow="Analytics"
+      description="Acompanhe entregas, respostas e sinais de engajamento das suas campanhas."
+      actions={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchData}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Atualizar
+        </Button>
+      }
+    >
+      <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="hidden">
           <div>
             <h1 className="text-2xl font-bold">Resultados</h1>
             <p className="text-muted-foreground">Acompanhe o desempenho das suas campanhas</p>
@@ -401,6 +416,7 @@ const Results = () => {
             size="sm" 
             onClick={fetchData}
             disabled={loading}
+            className="hidden"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
@@ -926,9 +942,8 @@ const Results = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </AppShell>
   );
 };
 

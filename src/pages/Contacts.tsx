@@ -34,6 +34,7 @@ import {
   Play,
   Pause,
   Timer,
+  Zap,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ import { IVRConfigEditor, type IVRMenuItem } from "@/components/IVRConfigEditor"
 import { toast } from "@/hooks/use-toast";
 import { CampaignProgressModal } from "@/components/CampaignProgressModal";
 import { CONTACTS_CONFIG } from "@/config/app.config";
+import { AppShell } from "@/components/layout/AppShell";
 
 interface Contact {
   id: string;
@@ -1052,9 +1054,25 @@ const Contacts = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppShell
+      title="Campanhas e contatos"
+      eyebrow="Marketing"
+      description="Importe listas, escolha canais e acompanhe campanhas como um centro de operação multicanal."
+      actions={
+        <>
+          <Button variant="outline" size="sm" onClick={() => navigate("/results")}>
+            <MessageSquare className="h-4 w-4" />
+            Resultados
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+            <Settings className="h-4 w-4" />
+            Configurações
+          </Button>
+        </>
+      }
+    >
       {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+      <div className="hidden">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <a href="/" className="flex items-center gap-2">
@@ -1121,14 +1139,63 @@ const Contacts = () => {
             </DropdownMenu>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
+          <div className="mb-8 grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+            <div className="rounded-lg border border-[#c8d7ff] bg-white p-5 shadow-sm dark:border-[#173a8a] dark:bg-slate-900">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0047ff]">Próxima campanha</p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950 dark:text-white">
+                    Comece por uma lista segmentada
+                  </h2>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#0047ff] text-white">
+                  <Zap className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Importe contatos, escolha WhatsApp, ligação, SMS ou e-mail e acompanhe respostas em tempo real.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" />
+                  Importar contatos
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+                  Conectar canais
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-sm font-semibold text-slate-950 dark:text-white">Canais ativos</p>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                {availableActions.map((action) => (
+                  <div key={action.id} className="rounded-md bg-slate-50 px-3 py-2 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                    {action.label.replace("Enviar ", "")}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-[#f7f9ff] p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-sm font-semibold text-slate-950 dark:text-white">Sugestão inteligente</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Use intervalos e aquecimento progressivo para proteger entregabilidade em campanhas maiores.
+              </p>
+              <Button variant="link" className="mt-3 h-auto p-0 text-[#0047ff]" onClick={() => navigate("/results")}>
+                Ver performance
+              </Button>
+            </div>
+          </div>
+
           {/* Upload Section */}
           <div className="mb-8">
             <h1 className="text-2xl font-display font-bold text-foreground mb-2">
@@ -2208,8 +2275,8 @@ const Contacts = () => {
             cancelCampaignRef.current = true;
           }}
         />
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 };
 
